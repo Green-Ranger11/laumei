@@ -71,15 +71,9 @@ add_custom_target(compat-tools ALL
 add_dependencies(laumei-compat laumei)
 
 # <prefix>/Applications/Laumei.app, with <prefix>/bin/laumei pointing into it.
-# The qs alias lets configs shared with Linux, which call Quickshell's `qs`,
-# reach Laumei unchanged.
-option(LAUMEI_QS_ALIAS "Also install a qs command for configs written for Quickshell" ON)
 install(TARGETS laumei BUNDLE DESTINATION Applications)
 install(CODE "
     set(exe \"\${CMAKE_INSTALL_PREFIX}/Applications/Laumei.app/Contents/MacOS/Laumei\")
     file(MAKE_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}/bin\")
     file(CREATE_LINK \"\${exe}\" \"\${CMAKE_INSTALL_PREFIX}/bin/laumei\" SYMBOLIC)
-    if(${LAUMEI_QS_ALIAS})
-        file(CREATE_LINK \"\${exe}\" \"\${CMAKE_INSTALL_PREFIX}/bin/qs\" SYMBOLIC)
-    endif()
 ")

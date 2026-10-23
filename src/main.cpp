@@ -1,5 +1,4 @@
 // laumei: run a Quickshell config on macOS, or talk to a running one.
-// Also installed as `qs`, the name Quickshell configs call.
 //
 //   laumei [-p <path> | -c <name>] [--replace]       run the shell
 //   laumei [-p <path> | -c <name>] ipc show          list IPC targets
@@ -194,7 +193,7 @@ int main(int argc, char** argv) {
         return runClient(rest);
     }
 
-    // Started through a symlink (~/.local/bin/laumei or qs), macOS doesn't tie the
+    // Started through a symlink (~/.local/bin/laumei), macOS doesn't tie the
     // process to Laumei.app: no bundle id, so no Location/Bluetooth prompts.
     // Re-exec from the real path inside the bundle.
     {

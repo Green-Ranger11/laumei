@@ -5,8 +5,7 @@ Run [Quickshell](https://quickshell.org) configs on macOS.
 Quickshell is Linux-only (Wayland/X11). This is a separate runtime that
 provides Quickshell's QML modules on top of plain Qt, so QML written for
 Quickshell loads unchanged where macOS can host it. It installs a `laumei`
-command with the same CLI, plus a `qs` alias so configs that call Quickshell's
-`qs` keep working.
+command with the same CLI as Quickshell's `qs`.
 
 ## Status
 
@@ -65,7 +64,7 @@ Needs Qt 6.5+ and CMake.
 brew install qt cmake ninja
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=$(brew --prefix qt)
 cmake --build build
-cmake --install build --prefix ~/.local   # ~/.local/Applications/Laumei.app, ~/.local/bin/{laumei,qs}
+cmake --install build --prefix ~/.local   # ~/.local/Applications/Laumei.app, ~/.local/bin/laumei
 ```
 
 ## Use
@@ -101,3 +100,11 @@ ShellRoot {
     EmojiPicker {}
 }
 ```
+
+Widgets that call the shell's own CLI (`qs ipc call ...` on Linux) should pick
+the command by platform:
+
+```qml
+readonly property string shellCommand: Qt.platform.os === "osx" ? "laumei" : "qs"
+```
+
