@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(quickshell-macos VERSION 0.1.0 LANGUAGES CXX OBJCXX)
+project(laumei VERSION 0.1.0 LANGUAGES CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,8 +31,9 @@ qt_add_executable(qs MACOSX_BUNDLE
 # A real .app so macOS can ask for Location (Wi-Fi network names) and
 # Bluetooth access on its behalf. LSUIElement keeps it out of the Dock.
 set_target_properties(qs PROPERTIES
+    OUTPUT_NAME Laumei
     MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/packaging/Info.plist.in
-    MACOSX_BUNDLE_GUI_IDENTIFIER io.github.quickshell-macos
+    MACOSX_BUNDLE_GUI_IDENTIFIER io.github.laumei
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
 )
@@ -69,10 +70,10 @@ add_custom_target(compat-tools ALL
     DEPENDS ${COMPAT_TOOLS} qs)
 add_dependencies(qs-compat qs)
 
-# <prefix>/Applications/qs.app, with <prefix>/bin/qs pointing into it.
+# <prefix>/Applications/Laumei.app, with <prefix>/bin/qs pointing into it.
 install(TARGETS qs BUNDLE DESTINATION Applications)
 install(CODE "
     file(MAKE_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}/bin\")
-    file(CREATE_LINK \"\${CMAKE_INSTALL_PREFIX}/Applications/qs.app/Contents/MacOS/qs\"
+    file(CREATE_LINK \"\${CMAKE_INSTALL_PREFIX}/Applications/Laumei.app/Contents/MacOS/Laumei\"
                      \"\${CMAKE_INSTALL_PREFIX}/bin/qs\" SYMBOLIC)
 ")

@@ -48,11 +48,11 @@ namespace Ipc {
 
 QString socketPath() {
     // $TMPDIR is per-user on macOS, so sockets don't collide between users.
-    return QDir::tempPath() + "/quickshell-macos/" + QsPaths::shellId() + ".sock";
+    return QDir::tempPath() + "/laumei/" + QsPaths::shellId() + ".sock";
 }
 
 bool listen(QLocalServer* server) {
-    QDir().mkpath(QDir::tempPath() + "/quickshell-macos");
+    QDir().mkpath(QDir::tempPath() + "/laumei");
     QLocalSocket probe;
     probe.connectToServer(socketPath());
     if (probe.waitForConnected(200)) return false;

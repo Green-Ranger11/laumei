@@ -35,7 +35,7 @@ QString cacheDir() { return byShell(xdg("XDG_CACHE_HOME", "/.cache")); }
 QString dataDir() { return byShell(xdg("XDG_DATA_HOME", "/.local/share")); }
 
 QString compatBinDir() {
-    // qs.app/Contents/MacOS/qs -> qs.app/Contents/Resources/compat/bin.
+    // Laumei.app/Contents/MacOS/Laumei -> Laumei.app/Contents/Resources/compat/bin.
     const QDir exe(QCoreApplication::applicationDirPath());
     for (const QString& rel : {QStringLiteral("../Resources/compat/bin")}) {
         const QString p = QDir::cleanPath(exe.filePath(rel));

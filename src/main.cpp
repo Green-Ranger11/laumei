@@ -25,6 +25,10 @@
 #include <QTimer>
 #include <QtQml/qqmlextensionplugin.h>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <mach-o/dyld.h>
+#include <unistd.h>
 
 #include "iconprovider.h"
 #include "ipc.h"
@@ -187,6 +191,19 @@ int main(int argc, char** argv) {
     if (!rest.isEmpty()) {
         QCoreApplication app(argc, argv);
         return runClient(rest);
+    }
+
+    // Started through a symlink (~/.local/bin/qs), macOS doesn't tie the
+    // process to Laumei.app: no bundle id, so no Location/Bluetooth prompts.
+    // Re-exec from the real path inside the bundle.
+    {
+        char exe[4096];
+        uint32_t size = sizeof(exe);
+        char real[PATH_MAX];
+        if (_NSGetExecutablePath(exe, &size) == 0 && realpath(exe, real) && std::strcmp(argv[0], real) != 0) {
+            argv[0] = real;
+            execv(real, argv);
+        }
     }
 
     if (!QFileInfo::exists(QsPaths::shellPath())) {

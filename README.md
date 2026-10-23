@@ -1,4 +1,6 @@
-# quickshell-macos
+# Laumei
+
+*Laumei* is Samoan for turtle: a creature that carries its shell with it.
 
 Run [Quickshell](https://quickshell.org) configs on macOS.
 
@@ -49,7 +51,7 @@ macOS 27, which draws all menu-bar items as one window), `Services.Pam`,
   - `systemctl suspend|hibernate|reboot|poweroff|is-active` -> `pmset` / System Events
   - `loginctl lock-session|kill-session` -> lock screen / log out
   - `systemd-inhibit` -> `caffeinate`
-- **Permissions.** `qs` is an app bundle (`qs.app`, no Dock icon) so macOS
+- **Permissions.** `qs` lives in an app bundle (`Laumei.app`, no Dock icon) so macOS
   can ask for Location (Wi-Fi names) and Bluetooth access. Builds are ad-hoc
   signed, so a rebuild may ask again.
 - **Hot reload.** Every QML/qmldir/JS file the shell loads is watched,
@@ -64,7 +66,7 @@ Needs Qt 6.5+ and CMake.
 brew install qt cmake ninja
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=$(brew --prefix qt)
 cmake --build build
-cmake --install build --prefix ~/.local   # ~/.local/Applications/qs.app, ~/.local/bin/qs
+cmake --install build --prefix ~/.local   # ~/.local/Applications/Laumei.app, ~/.local/bin/qs
 ```
 
 ## Use
@@ -82,7 +84,7 @@ Run it at login with the LaunchAgent in `contrib/` (instructions inside).
 If you use yabai, tell it to leave `qs` windows alone:
 
 ```sh
-yabai -m rule --add app="^qs$" manage=off
+yabai -m rule --add app="^Laumei$" manage=off
 ```
 
 ### Sharing a config with Linux

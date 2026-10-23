@@ -2,14 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Starts `qs -c CONFIG` at login and restarts it if it crashes.
-  Install: sed "s|@HOME@|$HOME|g; s|@CONFIG@|mac|g" contrib/quickshell-macos.plist \
-             > ~/Library/LaunchAgents/quickshell-macos.plist
-           launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/quickshell-macos.plist
+  Install: sed "s|@HOME@|$HOME|g; s|@CONFIG@|mac|g" contrib/laumei.plist \
+             > ~/Library/LaunchAgents/laumei.plist
+           launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/laumei.plist
 -->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>quickshell-macos</string>
+    <string>laumei</string>
     <key>ProgramArguments</key>
     <array>
         <string>@HOME@/.local/bin/qs</string>
@@ -26,6 +26,6 @@
     <key>ProcessType</key>
     <string>Interactive</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/quickshell-macos.log</string>
+    <string>/tmp/laumei.log</string>
 </dict>
 </plist>

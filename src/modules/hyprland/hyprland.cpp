@@ -1,5 +1,6 @@
 #include "hyprland.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -76,8 +77,8 @@ void HyprlandMonitor::set(const QString& name, bool focused, HyprlandWorkspace* 
 Hyprland::Hyprland(QObject* parent)
     : QObject(parent), mWorkspaces(new ObjectModel(this)), mMonitors(new ObjectModel(this)),
       mToplevels(new ObjectModel(this)) {
-    mEventFile = QDir::tempPath() + "/quickshell-macos/yabai-events";
-    QDir().mkpath(QDir::tempPath() + "/quickshell-macos");
+    mEventFile = QDir::tempPath() + "/laumei/yabai-events";
+    QDir().mkpath(QDir::tempPath() + "/laumei");
     { QFile f(mEventFile); f.open(QIODevice::WriteOnly | QIODevice::Append); }
 
     mDebounce.setSingleShot(true);
@@ -103,7 +104,7 @@ void Hyprland::installSignals() {
     // Labelled, so re-adding on every start replaces rather than duplicates.
     const QString action = QString("echo x > '%1'").arg(mEventFile);
     for (const char* ev : kEvents) {
-        auto* p = yabai(this, {"-m", "signal", "--add", QString("label=quickshell_%1").arg(ev),
+        auto* p = yabai(this, {"-m", "signal", "--add", QString("label=laumei_%1").arg(ev),
                                QString("event=%1").arg(ev), "action=" + action});
         connect(p, &QProcess::finished, p, &QObject::deleteLater);
         p->start();
@@ -164,7 +165,7 @@ void Hyprland::apply(const QByteArray& spacesJson, const QByteArray& displaysJso
     for (const auto& v : windows) {
         const QJsonObject w = v.toObject();
         if (w.value("is-minimized").toBool() || w.value("is-hidden").toBool()) continue;
-        if (w.value("app").toString() == "qs") continue;
+        if (w.value("pid").toInteger() == QCoreApplication::applicationPid()) continue; // our own panels
         if (w.value("subrole").toString() != "AXStandardWindow") continue;
         const int id = w.value("id").toInt();
         seenToplevels.insert(id);
