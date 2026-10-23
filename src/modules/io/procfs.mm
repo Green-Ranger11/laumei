@@ -1,7 +1,10 @@
 #include "procfs.h"
 
+#include <QRegularExpression>
 #include <QSysInfo>
+#include <dlfcn.h>
 
+#import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
 #import <IOKit/hidsystem/IOHIDEventSystemClient.h>
 #include <mach/mach.h>
@@ -91,6 +94,21 @@ QByteArray cpuTemperature() {
     }
 }
 
+// Built-in display brightness, 0..1, through DisplayServices (private; it
+// is what the brightness keys use). -1 if unavailable.
+float displayBrightness() {
+    static auto get = [] {
+        void* h = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY);
+        return h ? reinterpret_cast<int (*)(CGDirectDisplayID, float*)>(dlsym(h, "DisplayServicesGetBrightness"))
+                 : nullptr;
+    }();
+    float v = -1;
+    if (!get || get(CGMainDisplayID(), &v) != 0) return -1;
+    return v;
+}
+
+constexpr int kBacklightMax = 1000;
+
 } // namespace
 
 namespace ProcFs {
@@ -99,6 +117,13 @@ std::optional<QByteArray> read(const QString& path) {
     if (path == "/proc/stat") return procStat();
     if (path == "/proc/meminfo") return procMeminfo();
     if (path == "/sys/class/thermal/thermal_zone0/temp") return cpuTemperature();
+    static const QRegularExpression backlight("^/sys/class/backlight/[^/]+/(brightness|actual_brightness|max_brightness)$");
+    if (auto m = backlight.match(path); m.hasMatch()) {
+        if (m.captured(1) == "max_brightness") return QByteArray::number(kBacklightMax) + '\n';
+        const float v = displayBrightness();
+        if (v < 0) return std::nullopt;
+        return QByteArray::number(qRound(v * kBacklightMax)) + '\n';
+    }
     if (path == "/etc/hostname") return QSysInfo::machineHostName().section('.', 0, 0).toUtf8() + '\n';
     return std::nullopt;
 }

@@ -18,7 +18,8 @@ QString QsNative::dataDir() const { return QsPaths::dataDir(); }
 qint64 QsNative::processId() const { return QCoreApplication::applicationPid(); }
 
 QVariant QsNative::env(const QString& name) const {
-    if (!qEnvironmentVariableIsSet(name.toUtf8().constData())) return {};
+    // null (not undefined) for an unset variable, as in Quickshell.
+    if (!qEnvironmentVariableIsSet(name.toUtf8().constData())) return QVariant::fromValue(nullptr);
     return qEnvironmentVariable(name.toUtf8().constData());
 }
 

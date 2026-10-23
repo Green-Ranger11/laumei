@@ -25,6 +25,9 @@ qt_add_qml_module(laumei_core
         Edges.qml
         PopupAnchor.qml
         PopupWindow.qml
+        LazyLoader.qml
+        QsMenuAnchor.qml
+        QsMenuHandle.qml
     DEPENDENCIES
         QtQuick
         Quickshell.Wayland

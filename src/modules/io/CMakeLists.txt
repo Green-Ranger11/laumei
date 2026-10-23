@@ -12,4 +12,4 @@ qt_add_qml_module(laumei_io
         procfs.mm procfs.h
 )
 target_include_directories(laumei_io PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(laumei_io PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework Foundation")
+target_link_libraries(laumei_io PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework Foundation" "-framework CoreGraphics")

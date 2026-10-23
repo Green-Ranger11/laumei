@@ -9,38 +9,40 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
+#include <QStandardPaths>
 
+#include "displaynames.h"
 #include "paths.h"
 
 namespace {
 
 // yabai events that can change spaces, displays or the windows on them.
-const char* const kEvents[] = {
+const char* const kYabaiEvents[] = {
     "space_changed",      "space_created",          "space_destroyed",      "display_changed",
     "display_added",      "display_removed",        "window_created",       "window_destroyed",
     "window_focused",     "window_minimized",       "window_deminimized",   "application_launched",
     "application_terminated", "application_hidden", "application_visible",
 };
 
-QProcess* yabai(QObject* parent, const QStringList& args) {
-    auto* p = new QProcess(parent);
+// Separates the outputs of the queries run in one shell.
+constexpr char kSep = '\x1e';
+
+QProcessEnvironment childEnv() {
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     env.insert("PATH", QsPaths::childPath());
-    p->setProcessEnvironment(env);
-    p->setProgram("/bin/sh");
-    p->setArguments({"-c", "exec yabai \"$@\"", "yabai"});
-    p->setArguments(p->arguments() + args);
-    return p;
+    return env;
 }
 
-void yabaiDetached(const QStringList& args) {
+void runDetached(const QString& script, const QStringList& args = {}) {
     QProcess p;
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("PATH", QsPaths::childPath());
-    p.setProcessEnvironment(env);
+    p.setProcessEnvironment(childEnv());
     p.setProgram("/bin/sh");
-    p.setArguments(QStringList{"-c", "yabai \"$@\"", "yabai"} + args);
+    p.setArguments(QStringList{"-c", script, "sh"} + args);
     p.startDetached();
+}
+
+bool onPath(const QString& tool) {
+    return !QStandardPaths::findExecutable(tool, QsPaths::childPath().split(':')).isEmpty();
 }
 
 } // namespace
@@ -53,8 +55,8 @@ void HyprlandToplevel::set(const QString& title, const QString& app, bool activa
     emit changed();
 }
 
-HyprlandWorkspace::HyprlandWorkspace(int id, QObject* parent)
-    : QObject(parent), mId(id), mToplevels(new ObjectModel(this)) {}
+HyprlandWorkspace::HyprlandWorkspace(int id, const QString& name, QObject* parent)
+    : QObject(parent), mId(id), mName(name), mToplevels(new ObjectModel(this)) {}
 
 void HyprlandWorkspace::set(bool active, bool focused, HyprlandMonitor* monitor) {
     if (active == mActive && focused == mFocused && monitor == mMonitor) return;
@@ -64,7 +66,9 @@ void HyprlandWorkspace::set(bool active, bool focused, HyprlandMonitor* monitor)
     emit changed();
 }
 
-void HyprlandWorkspace::activate() { yabaiDetached({"-m", "space", "--focus", QString::number(mId)}); }
+void HyprlandWorkspace::activate() {
+    if (auto* h = qobject_cast<Hyprland*>(parent())) h->dispatch("workspace " + mName);
+}
 
 void HyprlandMonitor::set(const QString& name, bool focused, HyprlandWorkspace* active) {
     if (name == mName && focused == mFocused && active == mActive) return;
@@ -77,37 +81,47 @@ void HyprlandMonitor::set(const QString& name, bool focused, HyprlandWorkspace* 
 Hyprland::Hyprland(QObject* parent)
     : QObject(parent), mWorkspaces(new ObjectModel(this)), mMonitors(new ObjectModel(this)),
       mToplevels(new ObjectModel(this)) {
-    mEventFile = QDir::tempPath() + "/laumei/yabai-events";
-    QDir().mkpath(QDir::tempPath() + "/laumei");
-    { QFile f(mEventFile); f.open(QIODevice::WriteOnly | QIODevice::Append); }
+    const QString wm = qEnvironmentVariable("LAUMEI_WM").toLower();
+    if (wm == "aerospace" || (wm != "yabai" && !onPath("yabai") && onPath("aerospace")))
+        mBackend = Backend::AeroSpace;
 
     mDebounce.setSingleShot(true);
     mDebounce.setInterval(40);
     connect(&mDebounce, &QTimer::timeout, this, &Hyprland::refresh);
-    connect(&mWatcher, &QFileSystemWatcher::fileChanged, this, [this] {
-        if (!mWatcher.files().contains(mEventFile)) mWatcher.addPath(mEventFile);
-        mDebounce.start();
-    });
-    mWatcher.addPath(mEventFile);
-
-    // Safety net for changes yabai has no event for (moving a window between
-    // spaces without following it).
-    mPoll.setInterval(5000);
     connect(&mPoll, &QTimer::timeout, this, &Hyprland::refresh);
-    mPoll.start();
 
-    installSignals();
+    if (mBackend == Backend::Yabai) {
+        // yabai signals touch this file; the watcher turns that into a refresh.
+        mEventFile = QDir::tempPath() + "/laumei/yabai-events";
+        QDir().mkpath(QDir::tempPath() + "/laumei");
+        { QFile f(mEventFile); f.open(QIODevice::WriteOnly | QIODevice::Append); }
+        connect(&mWatcher, &QFileSystemWatcher::fileChanged, this, [this] {
+            if (!mWatcher.files().contains(mEventFile)) mWatcher.addPath(mEventFile);
+            mDebounce.start();
+        });
+        mWatcher.addPath(mEventFile);
+        installSignals();
+        // Safety net for changes yabai has no event for (moving a window
+        // between spaces without following it).
+        mPoll.setInterval(5000);
+    } else {
+        // AeroSpace can only report changes through callbacks in its own
+        // config; its CLI is cheap enough to poll instead.
+        mPoll.setInterval(1000);
+    }
+    mPoll.start();
     refresh();
 }
 
 void Hyprland::installSignals() {
     // Labelled, so re-adding on every start replaces rather than duplicates.
     const QString action = QString("echo x > '%1'").arg(mEventFile);
-    for (const char* ev : kEvents) {
-        auto* p = yabai(this, {"-m", "signal", "--add", QString("label=laumei_%1").arg(ev),
-                               QString("event=%1").arg(ev), "action=" + action});
+    for (const char* ev : kYabaiEvents) {
+        auto* p = new QProcess(this);
+        p->setProcessEnvironment(childEnv());
         connect(p, &QProcess::finished, p, &QObject::deleteLater);
-        p->start();
+        p->start("/bin/sh", {"-c", "exec yabai \"$@\"", "yabai", "-m", "signal", "--add",
+                             QString("label=laumei_%1").arg(ev), QString("event=%1").arg(ev), "action=" + action});
     }
 }
 
@@ -118,64 +132,123 @@ void Hyprland::refresh() {
     }
     mRefreshing = true;
 
+    const QString script = mBackend == Backend::Yabai
+        ? "yabai -m query --spaces && printf '\\036' && yabai -m query --displays && printf '\\036' && "
+          "yabai -m query --windows"
+        : "aerospace list-monitors --format '%{monitor-id}|%{monitor-name}' && printf '\\036' && "
+          "aerospace list-monitors --focused --format '%{monitor-id}' && printf '\\036' && "
+          "aerospace list-workspaces --all --format "
+          "'%{workspace}|%{monitor-id}|%{workspace-is-visible}|%{workspace-is-focused}' && printf '\\036' && "
+          "aerospace list-windows --all --format '%{window-id}|%{workspace}|%{app-name}|%{window-title}' && "
+          "printf '\\036' && aerospace list-windows --focused --format '%{window-id}' 2>/dev/null; true";
+
     auto* p = new QProcess(this);
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("PATH", QsPaths::childPath());
-    p->setProcessEnvironment(env);
+    p->setProcessEnvironment(childEnv());
     connect(p, &QProcess::finished, this, [this, p](int code) {
         const QByteArray out = p->readAllStandardOutput();
         p->deleteLater();
         mRefreshing = false;
-        if (code == 0) {
-            const QList<QByteArray> parts = out.split('\x1e');
-            if (parts.size() == 3) apply(parts[0], parts[1], parts[2]);
-        }
+        if (code == 0) apply(mBackend == Backend::Yabai ? parseYabai(out) : parseAeroSpace(out));
         if (mRefreshAgain) {
             mRefreshAgain = false;
             refresh();
         }
     });
-    p->start("/bin/sh", {"-c", "yabai -m query --spaces && printf '\\036' && yabai -m query --displays "
-                               "&& printf '\\036' && yabai -m query --windows"});
+    p->start("/bin/sh", {"-c", script});
 }
 
-void Hyprland::apply(const QByteArray& spacesJson, const QByteArray& displaysJson, const QByteArray& windowsJson) {
-    const QJsonArray spaces = QJsonDocument::fromJson(spacesJson).array();
-    const QJsonArray displays = QJsonDocument::fromJson(displaysJson).array();
-    const QJsonArray windows = QJsonDocument::fromJson(windowsJson).array();
+Hyprland::Snapshot Hyprland::parseYabai(const QByteArray& out) const {
+    Snapshot snap;
+    const QList<QByteArray> parts = out.split(kSep);
+    if (parts.size() != 3) return snap;
 
+    for (const auto& v : QJsonDocument::fromJson(parts[1]).array()) {
+        const QJsonObject d = v.toObject();
+        // Qt (and so Quickshell.screens) names screens like macOS does.
+        snap.monitors.append({d.value("index").toInt(), displayName(d.value("id").toInteger()),
+                              d.value("has-focus").toBool()});
+    }
+    for (const auto& v : QJsonDocument::fromJson(parts[0]).array()) {
+        const QJsonObject s = v.toObject();
+        const int id = s.value("index").toInt();
+        snap.workspaces.append({id, QString::number(id), s.value("display").toInt(), s.value("is-visible").toBool(),
+                                s.value("has-focus").toBool()});
+    }
+    for (const auto& v : QJsonDocument::fromJson(parts[2]).array()) {
+        const QJsonObject w = v.toObject();
+        if (w.value("is-minimized").toBool() || w.value("is-hidden").toBool()) continue;
+        if (w.value("subrole").toString() != "AXStandardWindow") continue;
+        if (w.value("pid").toInteger() == QCoreApplication::applicationPid()) continue; // our own panels
+        snap.windows.append({w.value("id").toInt(), w.value("space").toInt(), w.value("app").toString(),
+                             w.value("title").toString(), w.value("has-focus").toBool()});
+    }
+    snap.valid = true;
+    return snap;
+}
+
+Hyprland::Snapshot Hyprland::parseAeroSpace(const QByteArray& out) const {
+    Snapshot snap;
+    const QList<QByteArray> parts = out.split(kSep);
+    if (parts.size() < 5) return snap;
+    auto lines = [](const QByteArray& b) { return QString::fromUtf8(b).split('\n', Qt::SkipEmptyParts); };
+
+    const int focusedMonitor = QString::fromUtf8(parts[1]).trimmed().toInt();
+    for (const QString& l : lines(parts[0])) {
+        const int id = l.section('|', 0, 0).toInt();
+        snap.monitors.append({id, l.section('|', 1), id == focusedMonitor});
+    }
+
+    // Workspace names are free-form; numeric ones keep their number as id
+    // (configs index workspaces 1..N), the rest are numbered after them.
+    QHash<QString, int> idOf;
+    int nextId = 1000;
+    for (const QString& l : lines(parts[2])) {
+        const QString name = l.section('|', 0, 0);
+        bool numeric;
+        const int n = name.toInt(&numeric);
+        const int id = numeric ? n : nextId++;
+        idOf[name] = id;
+        snap.workspaces.append({id, name, l.section('|', 1, 1).toInt(), l.section('|', 2, 2) == "true",
+                                l.section('|', 3, 3) == "true"});
+    }
+
+    const int focusedWindow = QString::fromUtf8(parts[4]).trimmed().toInt();
+    for (const QString& l : lines(parts[3])) {
+        const int id = l.section('|', 0, 0).toInt();
+        snap.windows.append({id, idOf.value(l.section('|', 1, 1), -1), l.section('|', 2, 2), l.section('|', 3),
+                             id == focusedWindow});
+    }
+    snap.valid = !snap.monitors.isEmpty();
+    return snap;
+}
+
+void Hyprland::apply(const Snapshot& snap) {
+    if (!snap.valid) return;
     // Monitors.
     QSet<int> seenMonitors;
     HyprlandMonitor* focusedMonitor = nullptr;
-    for (const auto& v : displays) {
-        const QJsonObject d = v.toObject();
-        const int id = d.value("index").toInt();
-        seenMonitors.insert(id);
-        auto*& m = mMonitorById[id];
-        if (!m) {
-            m = new HyprlandMonitor(id, this);
-            mMonitors->append(m);
+    for (const auto& m : snap.monitors) {
+        seenMonitors.insert(m.id);
+        auto*& mon = mMonitorById[m.id];
+        if (!mon) {
+            mon = new HyprlandMonitor(m.id, this);
+            mMonitors->append(mon);
         }
-        if (d.value("has-focus").toBool()) focusedMonitor = m;
+        if (m.focused) focusedMonitor = mon;
     }
 
-    // Toplevels: real windows only (not minimized/hidden, not our own).
-    QHash<int, QList<HyprlandToplevel*>> bySpace;
+    // Toplevels.
+    QHash<int, QList<HyprlandToplevel*>> byWorkspace;
     QSet<int> seenToplevels;
-    for (const auto& v : windows) {
-        const QJsonObject w = v.toObject();
-        if (w.value("is-minimized").toBool() || w.value("is-hidden").toBool()) continue;
-        if (w.value("pid").toInteger() == QCoreApplication::applicationPid()) continue; // our own panels
-        if (w.value("subrole").toString() != "AXStandardWindow") continue;
-        const int id = w.value("id").toInt();
-        seenToplevels.insert(id);
-        auto*& t = mToplevelById[id];
+    for (const auto& w : snap.windows) {
+        seenToplevels.insert(w.id);
+        auto*& t = mToplevelById[w.id];
         if (!t) {
-            t = new HyprlandToplevel(id, this);
+            t = new HyprlandToplevel(w.id, this);
             mToplevels->append(t);
         }
-        t->set(w.value("title").toString(), w.value("app").toString(), w.value("has-focus").toBool());
-        bySpace[w.value("space").toInt()].append(t);
+        t->set(w.title, w.app, w.focused);
+        byWorkspace[w.workspace].append(t);
     }
     for (auto it = mToplevelById.begin(); it != mToplevelById.end();) {
         if (seenToplevels.contains(it.key())) { ++it; continue; }
@@ -185,29 +258,23 @@ void Hyprland::apply(const QByteArray& spacesJson, const QByteArray& displaysJso
         it = mToplevelById.erase(it);
     }
 
-    // Workspaces: like Hyprland, only spaces with windows or on screen exist.
+    // Workspaces: like Hyprland, only those with windows or on screen exist.
     QSet<int> seenWorkspaces;
     HyprlandWorkspace* focused = nullptr;
-    QHash<int, HyprlandWorkspace*> visibleOnDisplay;
-    for (const auto& v : spaces) {
-        const QJsonObject s = v.toObject();
-        const int id = s.value("index").toInt();
-        const bool visible = s.value("is-visible").toBool();
-        const bool hasFocus = s.value("has-focus").toBool();
-        if (!visible && bySpace.value(id).isEmpty()) continue;
-        seenWorkspaces.insert(id);
-        auto*& ws = mWorkspaceById[id];
+    QHash<int, HyprlandWorkspace*> visibleOnMonitor;
+    for (const auto& s : snap.workspaces) {
+        if (!s.visible && byWorkspace.value(s.id).isEmpty()) continue;
+        seenWorkspaces.insert(s.id);
+        auto*& ws = mWorkspaceById[s.id];
         if (!ws) {
-            ws = new HyprlandWorkspace(id, this);
-            // Keep the model in id order, like Hyprland's.
+            ws = new HyprlandWorkspace(s.id, s.name, this);
             mWorkspaces->append(ws);
         }
-        HyprlandMonitor* mon = mMonitorById.value(s.value("display").toInt());
-        ws->set(visible, hasFocus, mon);
-        if (visible) visibleOnDisplay[s.value("display").toInt()] = ws;
-        if (hasFocus) focused = ws;
+        ws->set(s.visible, s.focused, mMonitorById.value(s.monitor));
+        if (s.visible) visibleOnMonitor[s.monitor] = ws;
+        if (s.focused) focused = ws;
 
-        const QList<HyprlandToplevel*> want = bySpace.value(id);
+        const QList<HyprlandToplevel*> want = byWorkspace.value(s.id);
         for (QObject* o : ws->toplevels()->values())
             if (!want.contains(static_cast<HyprlandToplevel*>(o))) ws->toplevels()->remove(o);
         for (HyprlandToplevel* t : want)
@@ -221,11 +288,7 @@ void Hyprland::apply(const QByteArray& spacesJson, const QByteArray& displaysJso
         it = mWorkspaceById.erase(it);
     }
 
-    for (const auto& v : displays) {
-        const QJsonObject d = v.toObject();
-        const int id = d.value("index").toInt();
-        mMonitorById[id]->set(QString("Display %1").arg(id), d.value("has-focus").toBool(), visibleOnDisplay.value(id));
-    }
+    for (const auto& m : snap.monitors) mMonitorById[m.id]->set(m.name, m.focused, visibleOnMonitor.value(m.id));
     for (auto it = mMonitorById.begin(); it != mMonitorById.end();) {
         if (seenMonitors.contains(it.key())) { ++it; continue; }
         mMonitors->remove(it.value());
@@ -245,7 +308,7 @@ void Hyprland::apply(const QByteArray& spacesJson, const QByteArray& displaysJso
 }
 
 void Hyprland::dispatch(const QString& request) {
-    static const QRegularExpression luaTarget(R"re(workspace\s*=\s*"?([+-]?[\w+-]+)"?)re");
+    static const QRegularExpression luaTarget(R"re(workspace\s*=\s*"?([^",}\s]+)"?)re");
     static const QRegularExpression classic(R"re(^\s*(workspace|movetoworkspace|movetoworkspacesilent)\s+(\S+))re");
 
     QString verb, target;
@@ -257,27 +320,24 @@ void Hyprland::dispatch(const QString& request) {
         verb = request.contains("window.move") ? (request.contains("silent") ? "movetoworkspacesilent" : "movetoworkspace")
                                                : "workspace";
     } else {
-        qWarning().noquote() << "Hyprland.dispatch: no yabai equivalent for" << request;
+        qWarning().noquote() << "Hyprland.dispatch: no equivalent for" << request;
         return;
     }
 
-    // "e+1"/"e-1" (and "+1"/"-1"): next/previous space.
+    // "e+1"/"e-1" (and "+1"/"-1"): next/previous workspace.
     QString sel = target;
     if (target.endsWith("+1")) sel = "next";
     else if (target.endsWith("-1")) sel = "prev";
 
-    if (verb == "workspace") {
-        yabaiDetached({"-m", "space", "--focus", sel});
-    } else if (verb == "movetoworkspacesilent") {
-        yabaiDetached({"-m", "window", "--space", sel});
+    if (mBackend == Backend::Yabai) {
+        if (verb == "workspace") runDetached("yabai -m space --focus \"$1\"", {sel});
+        else if (verb == "movetoworkspacesilent") runDetached("yabai -m window --space \"$1\"", {sel});
+        // Move, then follow; one shell so the focus waits for the move.
+        else runDetached("yabai -m window --space \"$1\" && yabai -m space --focus \"$1\"", {sel});
     } else {
-        // Move, then follow; in one shell so the focus waits for the move.
-        QProcess p;
-        QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-        env.insert("PATH", QsPaths::childPath());
-        p.setProcessEnvironment(env);
-        p.setProgram("/bin/sh");
-        p.setArguments({"-c", "yabai -m window --space \"$1\" && yabai -m space --focus \"$1\"", "sh", sel});
-        p.startDetached();
+        if (verb == "workspace") runDetached("aerospace workspace \"$1\"", {sel});
+        else if (verb == "movetoworkspacesilent") runDetached("aerospace move-node-to-workspace \"$1\"", {sel});
+        else runDetached("aerospace move-node-to-workspace --focus-follows-window \"$1\"", {sel});
     }
+    mDebounce.start();
 }

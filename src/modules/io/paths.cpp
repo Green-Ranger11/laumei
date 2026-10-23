@@ -47,9 +47,9 @@ QString compatBinDir() {
 QString childPath() {
     QStringList parts;
     if (const QString c = compatBinDir(); !c.isEmpty()) parts << c;
+    parts << qEnvironmentVariable("PATH", "/usr/bin:/bin:/usr/sbin:/sbin").split(':');
     parts << QDir::homePath() + "/.local/bin" << "/opt/homebrew/bin" << "/opt/homebrew/sbin"
           << "/usr/local/bin";
-    parts << qEnvironmentVariable("PATH", "/usr/bin:/bin:/usr/sbin:/sbin").split(':');
     parts.removeDuplicates();
     parts.removeAll(QString());
     return parts.join(':');

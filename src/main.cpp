@@ -45,6 +45,9 @@ Q_IMPORT_QML_PLUGIN(Quickshell_HyprlandPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_Services_PipewirePlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_Services_UPowerPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_Services_MprisPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_Services_NotificationsPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_Services_SystemTrayPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_Services_PamPlugin)
 
 namespace {
 
@@ -89,6 +92,10 @@ public:
 
     bool load() {
         auto* engine = new QQmlEngine(this);
+        // Qt.quit() / Qt.exit(code) end laumei, as they end qs.
+        connect(engine, &QQmlEngine::quit, QCoreApplication::instance(), &QCoreApplication::quit, Qt::QueuedConnection);
+        connect(engine, &QQmlEngine::exit, QCoreApplication::instance(),
+                [](int code) { QCoreApplication::exit(code); }, Qt::QueuedConnection);
         auto* tracker = new FileTracker;
         engine->addUrlInterceptor(tracker);
         engine->addImageProvider("icon", new IconProvider);

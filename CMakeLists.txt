@@ -22,6 +22,9 @@ add_subdirectory(src/modules/hyprland)
 add_subdirectory(src/modules/pipewire)
 add_subdirectory(src/modules/upower)
 add_subdirectory(src/modules/mpris)
+add_subdirectory(src/modules/notifications)
+add_subdirectory(src/modules/systemtray)
+add_subdirectory(src/modules/pam)
 
 qt_add_executable(laumei MACOSX_BUNDLE
     src/main.cpp
@@ -50,6 +53,9 @@ target_link_libraries(laumei PRIVATE
     laumei_pipewire laumei_pipewireplugin
     laumei_upower laumei_upowerplugin
     laumei_mpris laumei_mprisplugin
+    laumei_notifications laumei_notificationsplugin
+    laumei_systemtray laumei_systemtrayplugin
+    laumei_pam laumei_pamplugin
 )
 
 # Linux tools that configs shell out to (wl-copy, notify-send, systemctl, ...)

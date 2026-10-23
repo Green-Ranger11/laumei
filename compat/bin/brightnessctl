@@ -1,0 +1,34 @@
+#!/bin/sh
+# brightnessctl on macOS: the built-in display, in brightnessctl's terms.
+#   brightnessctl [-d dev] set|s 50% | 5%+ | 5%- | +5% | 120   (device ignored)
+#   brightnessctl [-d dev] get|g | max|m | info|i
+# Values are on a 0..1000 scale, matching /sys/class/backlight as Laumei
+# presents it.
+helper="$(dirname "$0")/laumei-compat"
+max=1000
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -d|--device|-c|--class) shift 2 ;;
+        --device=*|--class=*|-q|--quiet|-n*|-e*|--min-value*|--exponent*|-r|--restore|-s|--save) shift ;;
+        *) break ;;
+    esac
+done
+cur=$("$helper" brightness get) || exit 1
+now=$(awk -v v="$cur" -v m=$max 'BEGIN { printf "%d", v * m + 0.5 }')
+case "$1" in
+    get|g) echo "$now" ;;
+    max|m) echo "$max" ;;
+    info|i|"") echo "Device 'display' of class 'backlight':"; echo "	Current brightness: $now ($(( now * 100 / max ))%)"; echo "	Max brightness: $max" ;;
+    set|s)
+        arg="$2"
+        new=$(awk -v a="$arg" -v n="$now" -v m=$max 'BEGIN {
+            pct = (a ~ /%/); sub(/%/, "", a)
+            sign = ""; if (a ~ /^[+-]/) { sign = substr(a, 1, 1); a = substr(a, 2) }
+            else if (a ~ /[+-]$/) { sign = substr(a, length(a)); a = substr(a, 1, length(a) - 1) }
+            d = pct ? a * m / 100 : a
+            v = sign == "+" ? n + d : sign == "-" ? n - d : d
+            if (v < 0) v = 0; if (v > m) v = m
+            printf "%.4f", v / m }')
+        "$helper" brightness set "$new" ;;
+    *) echo "brightnessctl: '$1' is not supported on macOS" >&2; exit 1 ;;
+esac

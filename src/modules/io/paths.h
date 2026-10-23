@@ -24,8 +24,8 @@ QString dataDir();
 // Directory holding the compat/bin shims (wl-copy, notify-send, ...).
 QString compatBinDir();
 
-// PATH for child processes: compat shims first, then Homebrew, then the
-// inherited PATH (launchd/skhd give a bare /usr/bin:/bin).
+// PATH for child processes: compat shims first, then the inherited PATH,
+// then ~/.local/bin and Homebrew (launchd/skhd give a bare /usr/bin:/bin).
 QString childPath();
 
 // Quickshell.reload(): main() installs the handler that rebuilds the shell.

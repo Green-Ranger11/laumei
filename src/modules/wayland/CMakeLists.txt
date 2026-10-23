@@ -4,6 +4,14 @@ qt_add_qml_module(laumei_wayland
     VERSION 1.0
     SOURCES
         layershell.cpp layershell.h
+        session.mm session.h
+    QML_FILES
+        WlSessionLock.qml
+        WlSessionLockSurface.qml
+        ScreencopyView.qml
+    DEPENDENCIES
+        QtQuick
 )
 target_include_directories(laumei_wayland PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(laumei_wayland PUBLIC Qt6::Core Qt6::Qml)
+target_link_libraries(laumei_wayland PUBLIC Qt6::Core Qt6::Qml laumei_io
+    "-framework IOKit" "-framework ApplicationServices")

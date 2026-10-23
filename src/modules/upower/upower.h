@@ -74,6 +74,50 @@ private:
     QString mModel;
 };
 
+class PowerProfile : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("PowerProfile is an enum.")
+
+public:
+    enum Enum { PowerSaver = 0, Balanced = 1, Performance = 2 };
+    Q_ENUM(Enum)
+};
+
+// macOS's one profile switch is Low Power Mode (PowerSaver); everything else
+// reads as Balanced. Changing it needs administrator rights, so `profile`
+// can't be set from here: writes are ignored with a warning.
+class PowerProfiles : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+    Q_PROPERTY(int profile READ profile WRITE setProfile NOTIFY profileChanged)
+    Q_PROPERTY(bool hasPerformanceProfile READ hasPerformanceProfile NOTIFY hasPerformanceProfileChanged)
+    Q_PROPERTY(QString degradationReason READ degradationReason CONSTANT)
+    Q_PROPERTY(QList<QObject*> holds READ holds CONSTANT)
+
+public:
+    explicit PowerProfiles(QObject* parent = nullptr);
+    ~PowerProfiles() override;
+
+    int profile() const { return mProfile; }
+    void setProfile(int p);
+    bool hasPerformanceProfile() const { return false; }
+    QString degradationReason() const { return {}; }
+    QList<QObject*> holds() const { return {}; }
+
+    void refresh();
+
+signals:
+    void profileChanged();
+    void hasPerformanceProfileChanged(); // never emitted: macOS has none
+
+private:
+    int mProfile = PowerProfile::Balanced;
+    void* mObserver = nullptr;
+    bool mWarned = false;
+};
+
 class UPower : public QObject {
     Q_OBJECT
     QML_ELEMENT

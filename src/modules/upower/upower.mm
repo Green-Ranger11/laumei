@@ -1,6 +1,10 @@
 #include "upower.h"
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <QMetaObject>
+#include <QPointer>
+
+#import <Foundation/Foundation.h>
 #include <IOKit/ps/IOPSKeys.h>
 #include <IOKit/ps/IOPowerSources.h>
 
@@ -47,6 +51,38 @@ void UPowerDevice::update(bool present, qreal pct, int state, qreal toEmpty, qre
     mHealth = health;
     mModel = model;
     emit changed();
+}
+
+PowerProfiles::PowerProfiles(QObject* parent) : QObject(parent) {
+    refresh();
+    QPointer<PowerProfiles> self(this);
+    id token = [NSNotificationCenter.defaultCenter
+        addObserverForName:NSProcessInfoPowerStateDidChangeNotification
+                    object:nil
+                     queue:nil
+                usingBlock:^(NSNotification*) {
+                    QMetaObject::invokeMethod(self, [self] { if (self) self->refresh(); }, Qt::QueuedConnection);
+                }];
+    mObserver = [token retain]; // manual retain/release: this file is not ARC
+}
+
+PowerProfiles::~PowerProfiles() {
+    if (!mObserver) return;
+    [NSNotificationCenter.defaultCenter removeObserver:static_cast<id>(mObserver)];
+    [static_cast<id>(mObserver) release];
+}
+
+void PowerProfiles::refresh() {
+    const int p = NSProcessInfo.processInfo.lowPowerModeEnabled ? PowerProfile::PowerSaver : PowerProfile::Balanced;
+    if (p == mProfile) return;
+    mProfile = p;
+    emit profileChanged();
+}
+
+void PowerProfiles::setProfile(int p) {
+    if (p == mProfile || mWarned) return;
+    mWarned = true;
+    qWarning("PowerProfiles: switching Low Power Mode needs administrator rights; ignoring.");
 }
 
 UPower::UPower(QObject* parent) : QObject(parent), mDevice(new UPowerDevice(this)) {

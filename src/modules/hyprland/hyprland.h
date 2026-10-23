@@ -8,9 +8,10 @@
 
 #include "objectmodel.h"
 
-// Quickshell.Hyprland on macOS, backed by yabai: yabai spaces are the
-// workspaces (id = space index), displays are the monitors, windows are the
-// toplevels. Needs yabai running.
+// Quickshell.Hyprland on macOS, backed by a tiling window manager: yabai
+// (spaces are the workspaces, id = space index) or AeroSpace (its workspaces;
+// numeric names become ids). Displays are the monitors, windows the toplevels.
+// yabai is used when installed; set LAUMEI_WM=aerospace (or yabai) to choose.
 
 class HyprlandToplevel : public QObject {
     Q_OBJECT
@@ -53,9 +54,9 @@ class HyprlandWorkspace : public QObject {
     Q_PROPERTY(ObjectModel* toplevels READ toplevels CONSTANT)
 
 public:
-    HyprlandWorkspace(int id, QObject* parent);
+    HyprlandWorkspace(int id, const QString& name, QObject* parent);
     int id() const { return mId; }
-    QString name() const { return QString::number(mId); }
+    QString name() const { return mName; }
     bool active() const { return mActive; }
     bool focused() const { return mFocused; }
     bool urgent() const { return false; }
@@ -70,6 +71,7 @@ signals:
 
 private:
     int mId;
+    QString mName;
     bool mActive = false;
     bool mFocused = false;
     HyprlandMonitor* mMonitor = nullptr;
@@ -122,8 +124,8 @@ public:
     HyprlandWorkspace* focusedWorkspace() const { return mFocusedWorkspace; }
     HyprlandMonitor* focusedMonitor() const { return mFocusedMonitor; }
 
-    // Hyprland dispatchers mapped onto yabai: workspace switching and moving
-    // the active window, in both "workspace 3" and Lua
+    // Hyprland dispatchers mapped onto the window manager: workspace switching
+    // and moving the active window, in both "workspace 3" and Lua
     // `hl.dsp.focus({ workspace = 3 })` forms. Others are logged and ignored.
     Q_INVOKABLE void dispatch(const QString& request);
     Q_INVOKABLE void refreshWorkspaces() { refresh(); }
@@ -135,10 +137,26 @@ signals:
     void focusedMonitorChanged();
     void rawEvent(QVariant event);
 
+public:
+    enum class Backend { Yabai, AeroSpace };
+
+    // What the window manager reported, before it's applied to the models.
+    struct Snapshot {
+        struct Monitor { int id; QString name; bool focused; };
+        struct Workspace { int id; QString name; int monitor; bool visible; bool focused; };
+        struct Window { int id; int workspace; QString app; QString title; bool focused; };
+        QList<Monitor> monitors;
+        QList<Workspace> workspaces;
+        QList<Window> windows;
+        bool valid = false; // false: the query failed; keep what we have
+    };
+
 private:
     void refresh();
-    void apply(const QByteArray& spaces, const QByteArray& displays, const QByteArray& windows);
+    void apply(const Snapshot& snap);
     void installSignals();
+    Snapshot parseYabai(const QByteArray& out) const;
+    Snapshot parseAeroSpace(const QByteArray& out) const;
 
     ObjectModel* mWorkspaces;
     ObjectModel* mMonitors;
@@ -148,6 +166,7 @@ private:
     QHash<int, HyprlandToplevel*> mToplevelById;
     HyprlandWorkspace* mFocusedWorkspace = nullptr;
     HyprlandMonitor* mFocusedMonitor = nullptr;
+    Backend mBackend = Backend::Yabai;
     QString mEventFile;
     QFileSystemWatcher mWatcher;
     QTimer mDebounce;

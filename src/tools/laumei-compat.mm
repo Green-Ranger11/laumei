@@ -7,8 +7,10 @@
 //   laumei-compat clip-types                                one MIME type per line
 //   laumei-compat clip-watch <command...>                   run command per change
 //   laumei-compat lock                                      lock the screen now
+//   laumei-compat brightness [get | set <0..1>]             built-in display
 
 #import <AppKit/AppKit.h>
+#include <algorithm>
 #include <dlfcn.h>
 #include <spawn.h>
 #include <sys/wait.h>
@@ -160,12 +162,35 @@ int lock() {
     return system("/usr/bin/pmset displaysleepnow") == 0 ? 0 : 1;
 }
 
+using BrightnessFn = int (*)(CGDirectDisplayID, float*);
+using SetBrightnessFn = int (*)(CGDirectDisplayID, float);
+
+// DisplayServices (private) is what the brightness keys use.
+int brightness(int argc, char** argv) {
+    void* h = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY);
+    auto get = h ? reinterpret_cast<BrightnessFn>(dlsym(h, "DisplayServicesGetBrightness")) : nullptr;
+    auto set = h ? reinterpret_cast<SetBrightnessFn>(dlsym(h, "DisplayServicesSetBrightness")) : nullptr;
+    if (!get || !set) {
+        fputs("laumei-compat: display brightness is not available\n", stderr);
+        return 1;
+    }
+    const CGDirectDisplayID display = CGMainDisplayID();
+    if (argc >= 2 && !strcmp(argv[0], "set")) {
+        const float v = std::clamp(strtof(argv[1], nullptr), 0.0f, 1.0f);
+        return set(display, v) == 0 ? 0 : 1;
+    }
+    float v = 0;
+    if (get(display, &v) != 0) return 1;
+    printf("%.4f\n", v);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     @autoreleasepool {
         if (argc < 2) {
-            fputs("usage: laumei-compat clip-copy|clip-clear|clip-paste|clip-types|clip-watch|lock ...\n", stderr);
+            fputs("usage: laumei-compat clip-copy|clip-clear|clip-paste|clip-types|clip-watch|lock|brightness ...\n", stderr);
             return 2;
         }
         const char* cmd = argv[1];
@@ -175,6 +200,7 @@ int main(int argc, char** argv) {
         if (!strcmp(cmd, "clip-types")) return clipTypes();
         if (!strcmp(cmd, "clip-watch")) return clipWatch(argc - 2, argv + 2);
         if (!strcmp(cmd, "lock")) return lock();
+        if (!strcmp(cmd, "brightness")) return brightness(argc - 2, argv + 2);
         fprintf(stderr, "laumei-compat: unknown command %s\n", cmd);
         return 2;
     }

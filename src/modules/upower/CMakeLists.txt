@@ -6,4 +6,4 @@ qt_add_qml_module(laumei_upower
         upower.mm upower.h
 )
 target_include_directories(laumei_upower PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(laumei_upower PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework CoreFoundation")
+target_link_libraries(laumei_upower PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework CoreFoundation" "-framework Foundation")
