@@ -1,0 +1,15 @@
+#!/bin/sh
+# wl-copy -> pbcopy. Text after the options (or after --) is copied;
+# otherwise stdin is. Options other than --clear are accepted and ignored.
+clear=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --) shift; break ;;
+        -c|--clear) clear=1; shift ;;
+        -t|--type|-s|--seat) shift 2 ;;
+        -*) shift ;;
+        *) break ;;
+    esac
+done
+if [ "$clear" = 1 ]; then printf '' | pbcopy; exit 0; fi
+if [ $# -gt 0 ]; then printf '%s' "$*" | pbcopy; else pbcopy; fi
