@@ -1,0 +1,10 @@
+#!/bin/sh
+# Fake AeroSpace CLI: fixed answers, and a log of commands that change state.
+case "$*" in
+    "list-monitors --format %{monitor-id}|%{monitor-name}") echo "1|Test Display" ;;
+    "list-monitors --focused --format %{monitor-id}") echo 1 ;;
+    "list-workspaces --all --format "*) printf '1|1|true|true\n2|1|false|false\n3|1|false|false\nweb|1|false|false\n' ;;
+    "list-windows --all --format "*) printf '11|1|kitty|zsh\n12|2|Firefox|GitHub\n13|web|Safari|Docs\n' ;;
+    "list-windows --focused --format %{window-id}") echo 11 ;;
+    *) echo "$*" >> "${AEROSPACE_MOCK_LOG:-/dev/null}" ;;
+esac
