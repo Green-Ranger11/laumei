@@ -6,6 +6,8 @@
 #include <QSaveFile>
 #include <QUrl>
 
+#include "procfs.h"
+
 // Error codes match Quickshell's FileViewError enum.
 enum { ErrUnknown = 0, ErrNotFound = 1, ErrPermissionDenied = 2, ErrNotAFile = 3 };
 
@@ -53,6 +55,12 @@ void FileView::updateWatch() {
 
 bool FileView::readNow() {
     const QString p = localPath();
+    // Linux /proc and /sys stats, synthesized on macOS.
+    if (auto synth = ProcFs::read(p)) {
+        mData = *synth;
+        mHaveData = true;
+        return true;
+    }
     QFile f(p);
     int err = ErrUnknown;
     if (!QFileInfo::exists(p)) err = ErrNotFound;

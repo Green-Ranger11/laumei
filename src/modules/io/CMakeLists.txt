@@ -9,6 +9,7 @@ qt_add_qml_module(qs_io
         ipchandler.cpp ipchandler.h
         paths.cpp paths.h
         objectmodel.h
+        procfs.mm procfs.h
 )
 target_include_directories(qs_io PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(qs_io PUBLIC Qt6::Core Qt6::Qml)
+target_link_libraries(qs_io PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework Foundation")

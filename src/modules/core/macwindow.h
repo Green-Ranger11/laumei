@@ -24,6 +24,10 @@ public:
     // Hands focus back to the app `activate` took it from.
     Q_INVOKABLE void restoreFocus();
 
+    // Takes the window off screen (or puts it back) without Qt's visibility
+    // changing, for a bar stepping aside while the native menu bar shows.
+    Q_INVOKABLE void setSuppressed(QWindow* window, bool suppressed);
+
     // No Dock icon or menu bar; called once at startup.
     static void makeAccessoryApp();
 };

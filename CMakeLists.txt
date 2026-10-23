@@ -18,6 +18,10 @@ add_subdirectory(src/modules/core)
 add_subdirectory(src/modules/widgets)
 add_subdirectory(src/modules/bluetooth)
 add_subdirectory(src/modules/networking)
+add_subdirectory(src/modules/hyprland)
+add_subdirectory(src/modules/pipewire)
+add_subdirectory(src/modules/upower)
+add_subdirectory(src/modules/mpris)
 
 qt_add_executable(qs MACOSX_BUNDLE
     src/main.cpp
@@ -41,6 +45,10 @@ target_link_libraries(qs PRIVATE
     qs_widgets qs_widgetsplugin
     qs_bluetooth qs_bluetoothplugin
     qs_networking qs_networkingplugin
+    qs_hyprland qs_hyprlandplugin
+    qs_pipewire qs_pipewireplugin
+    qs_upower qs_upowerplugin
+    qs_mpris qs_mprisplugin
 )
 
 # Linux tools that configs shell out to (wl-copy, notify-send, systemctl, ...)

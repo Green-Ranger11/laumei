@@ -9,6 +9,7 @@ qt_add_qml_module(qs_core
         desktopentries.mm desktopentries.h
         iconprovider.mm iconprovider.h
         macwindow.mm macwindow.h
+        menubar.mm menubar.h
     QML_FILES
         Quickshell.qml
         ShellRoot.qml
@@ -20,6 +21,10 @@ qt_add_qml_module(qs_core
         PanelAnchors.qml
         PanelMargins.qml
         Region.qml
+        SystemClock.qml
+        Edges.qml
+        PopupAnchor.qml
+        PopupWindow.qml
     DEPENDENCIES
         QtQuick
         Quickshell.Wayland

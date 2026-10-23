@@ -37,6 +37,10 @@ Q_IMPORT_QML_PLUGIN(Quickshell_WaylandPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_WidgetsPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_BluetoothPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_NetworkingPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_HyprlandPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_Services_PipewirePlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_Services_UPowerPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_Services_MprisPlugin)
 
 namespace {
 

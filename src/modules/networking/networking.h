@@ -15,7 +15,17 @@ class DeviceType : public QObject {
     QML_UNCREATABLE("DeviceType is an enum.")
 
 public:
-    enum Enum { None = 0, Wifi = 1 };
+    enum Enum { None = 0, Wifi = 1, Wired = 2 };
+    Q_ENUM(Enum)
+};
+
+class ConnectionState : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("ConnectionState is an enum.")
+
+public:
+    enum Enum { Unknown = 0, Connecting, Connected, Disconnecting, Disconnected };
     Q_ENUM(Enum)
 };
 
@@ -102,6 +112,9 @@ class WifiDevice : public QObject {
     Q_PROPERTY(QString name READ name CONSTANT)
     Q_PROPERTY(int type READ type CONSTANT)
     Q_PROPERTY(bool connected READ connected NOTIFY connectedChanged)
+    Q_PROPERTY(int state READ state NOTIFY connectedChanged)
+    // The joined network, once a scan has seen it (scans need Location access).
+    Q_PROPERTY(WifiNetwork* network READ network NOTIFY networkChanged)
     Q_PROPERTY(ObjectModel* networks READ networks CONSTANT)
     Q_PROPERTY(bool scannerEnabled READ scannerEnabled WRITE setScannerEnabled NOTIFY scannerEnabledChanged)
     // macOS auto-joins saved networks per network, with no device-wide switch;
@@ -113,7 +126,11 @@ public:
 
     QString name() const { return mName; }
     int type() const { return DeviceType::Wifi; }
-    bool connected() const { return !mCurrentSsid.isEmpty(); }
+    // Associated, judged by the link (RSSI) so it works without Location
+    // access, which hides the SSID.
+    bool connected() const { return mLinkUp; }
+    int state() const { return mLinkUp ? ConnectionState::Connected : ConnectionState::Disconnected; }
+    WifiNetwork* network() const { return mLinkUp ? find(mCurrentSsid) : nullptr; }
     ObjectModel* networks() const { return mNetworks; }
     bool scannerEnabled() const { return mScannerEnabled; }
     void setScannerEnabled(bool e);
@@ -124,6 +141,7 @@ public:
 
 signals:
     void connectedChanged();
+    void networkChanged();
     void scannerEnabledChanged();
     void autoconnectChanged();
 
@@ -138,6 +156,7 @@ private:
 
     QString mName;
     QString mCurrentSsid;
+    bool mLinkUp = false;
     QSet<QString> mKnown;
     ObjectModel* mNetworks;
     QTimer mScanTimer;

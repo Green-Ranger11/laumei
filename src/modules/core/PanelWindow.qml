@@ -106,6 +106,17 @@ Window {
         function onLeftChanged() { if (win._completed) win._place(); }
         function onRightChanged() { if (win._completed) win._place(); }
     }
+    // An auto-hidden native menu bar slides in over top-edge panels; step
+    // aside while it's down so it can be read (and clicked).
+    readonly property bool _yieldsToMenuBar: anchors.top && !anchors.bottom && WlrLayershell.layer >= WlrLayer.Top
+    Connections {
+        target: QsMacMenuBar
+        function onRevealedChanged() {
+            if (win._completed && win.visible && win._yieldsToMenuBar)
+                QsMacWindow.setSuppressed(win, QsMacMenuBar.revealed);
+        }
+    }
+
     Connections {
         target: win.WlrLayershell
         function onLayerChanged() { if (win._completed) win._configure(); }

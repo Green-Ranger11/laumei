@@ -63,6 +63,13 @@ void QsMacWindow::restoreFocus() {
     g_previousApp = nil;
 }
 
+void QsMacWindow::setSuppressed(QWindow* window, bool suppressed) {
+    NSWindow* w = nsWindow(window);
+    if (!w) return;
+    if (suppressed) [w orderOut:nil];
+    else if (window->isVisible()) [w orderFrontRegardless];
+}
+
 void QsMacWindow::makeAccessoryApp() {
     [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];

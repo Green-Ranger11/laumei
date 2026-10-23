@@ -149,8 +149,11 @@ void WifiDevice::setScannerEnabled(bool e) {
 void WifiDevice::refresh() {
     CWInterface* iface = wifiInterface();
     const QString current = QString::fromNSString(iface.ssid ?: @"");
-    const bool wasConnected = connected();
+    const bool linkUp = iface.powerOn && iface.rssiValue != 0;
+    const bool changed = linkUp != mLinkUp || current != mCurrentSsid;
     mCurrentSsid = current;
+    const bool wasConnected = mLinkUp;
+    mLinkUp = linkUp;
 
     mKnown.clear();
     for (CWNetworkProfile* profile in iface.configuration.networkProfiles)
@@ -161,6 +164,7 @@ void WifiDevice::refresh() {
         n->update(n->signalStrength(), n->security(), n->name() == mCurrentSsid, mKnown.contains(n->name()));
     }
     if (wasConnected != connected()) emit connectedChanged();
+    if (changed) emit networkChanged();
 }
 
 void WifiDevice::scan() {
@@ -210,6 +214,7 @@ void WifiDevice::applyScan(const QList<Seen>& seen) {
             n = new WifiNetwork(s.ssid, this);
             n->update(s.signal, s.security, s.ssid == mCurrentSsid, mKnown.contains(s.ssid));
             mNetworks->append(n);
+            if (s.ssid == mCurrentSsid) emit networkChanged();
         } else {
             n->update(s.signal, s.security, s.ssid == mCurrentSsid, mKnown.contains(s.ssid));
         }

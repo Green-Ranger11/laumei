@@ -1,0 +1,16 @@
+#!/bin/sh
+# systemd-inhibit on macOS: hold the inhibitor with caffeinate while the
+# command runs. --what=idle/sleep keep the Mac awake; options are otherwise
+# ignored.
+flags="-i"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --what=*) case "${1#*=}" in *sleep*) flags="-i -s" ;; esac; shift ;;
+        --*=*) shift ;;
+        --what|--who|--why|--mode) shift 2 ;;
+        --) shift; break ;;
+        -*) shift ;;
+        *) break ;;
+    esac
+done
+exec /usr/bin/caffeinate $flags "$@"
