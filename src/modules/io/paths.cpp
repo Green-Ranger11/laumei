@@ -35,11 +35,9 @@ QString cacheDir() { return byShell(xdg("XDG_CACHE_HOME", "/.cache")); }
 QString dataDir() { return byShell(xdg("XDG_DATA_HOME", "/.local/share")); }
 
 QString compatBinDir() {
-    // <prefix>/bin/qs -> <prefix>/share/quickshell-macos/compat/bin; the build
-    // tree mirrors the same layout next to the executable.
+    // qs.app/Contents/MacOS/qs -> qs.app/Contents/Resources/compat/bin.
     const QDir exe(QCoreApplication::applicationDirPath());
-    for (const QString& rel : {QStringLiteral("../share/quickshell-macos/compat/bin"),
-                               QStringLiteral("share/quickshell-macos/compat/bin")}) {
+    for (const QString& rel : {QStringLiteral("../Resources/compat/bin")}) {
         const QString p = QDir::cleanPath(exe.filePath(rel));
         if (QFileInfo(p).isDir()) return p;
     }

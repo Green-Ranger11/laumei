@@ -35,6 +35,8 @@ Q_IMPORT_QML_PLUGIN(QuickshellPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_IoPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_WaylandPlugin)
 Q_IMPORT_QML_PLUGIN(Quickshell_WidgetsPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_BluetoothPlugin)
+Q_IMPORT_QML_PLUGIN(Quickshell_NetworkingPlugin)
 
 namespace {
 

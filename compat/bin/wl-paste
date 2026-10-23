@@ -1,9 +1,21 @@
 #!/bin/sh
-# wl-paste -> pbpaste. -n/--no-newline is honoured; other options ignored.
+# wl-paste on macOS. --watch <cmd...> runs cmd with the clipboard on stdin on
+# every change (concealed copies, e.g. from password managers, are skipped).
+helper="$(dirname "$0")/qs-compat"
 newline=1
-for a in "$@"; do
-    case "$a" in -n|--no-newline) newline=0 ;; esac
+type=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -w|--watch) shift; exec "$helper" clip-watch "$@" ;;
+        -l|--list-types) exec "$helper" clip-types ;;
+        -n|--no-newline) newline=0; shift ;;
+        -t|--type) type="$2"; shift 2 ;;
+        --type=*) type="${1#*=}"; shift ;;
+        -s|--seat) shift 2 ;;
+        *) shift ;;
+    esac
 done
-pbpaste
+"$helper" clip-paste ${type:+--type "$type"} || exit 1
+case "$type" in image/*) exit 0 ;; esac
 [ "$newline" = 1 ] && echo
 exit 0

@@ -1,0 +1,9 @@
+#!/bin/sh
+# loginctl on macOS: lock and log out.
+case "$1" in
+    lock-session|lock-sessions) exec "$(dirname "$0")/qs-compat" lock ;;
+    kill-session|terminate-session|terminate-user)
+        # loginwindow's "really log out" event: no confirmation dialog.
+        exec /usr/bin/osascript -e 'tell application "loginwindow" to «event aevtrlgo»' ;;
+    *) echo "loginctl: '$1' is not available on macOS" >&2; exit 1 ;;
+esac

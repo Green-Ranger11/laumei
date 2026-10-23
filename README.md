@@ -17,10 +17,12 @@ Early. The goal is the picker/launcher style of config first, then bars.
 | `Quickshell.Io` | `Process`, `StdioCollector`, `SplitParser`, `FileView`, `IpcHandler` | |
 | `Quickshell.Wayland` | `WlrLayershell` (attached), `WlrLayer`, `WlrKeyboardFocus` | Mapped onto NSWindow levels and app activation. |
 | `Quickshell.Widgets` | `IconImage` | |
+| `Quickshell.Bluetooth` | `Bluetooth`, `BluetoothAdapter`, `BluetoothDevice`, `BluetoothDeviceState`, `BluetoothAdapterState` | IOBluetooth. Power, discoverable, scan, pair ("just works"), connect, forget, battery for Apple-protocol devices. macOS has no trusted/blocked flags: paired means trusted, nothing is blocked. |
+| `Quickshell.Networking` | `Networking`, `WifiDevice`, `WifiNetwork`, `DeviceType`, `WifiSecurityType`, `ConnectionFailReason` | CoreWLAN + `networksetup`. Needs Location access (macOS treats network names as location). Forgetting a network asks for an admin password. `autoconnect` is accepted but has no effect. |
 
 Not yet: `Quickshell.Hyprland`, `Services.*` (Pipewire, UPower, Mpris,
-Notifications, SystemTray, Pam), `Bluetooth`, `Networking`, `WlSessionLock`,
-`PopupWindow`, `LazyLoader`, `SystemClock`.
+Notifications, SystemTray, Pam), `WlSessionLock`, `PopupWindow`,
+`LazyLoader`, `SystemClock`.
 
 ### How it maps to macOS
 
@@ -32,9 +34,17 @@ Notifications, SystemTray, Pam), `Bluetooth`, `Networking`, `WlSessionLock`,
   for the focused output.
 - **No exclusive zones.** macOS has no way for a window to reserve screen
   space; reserve it in your window manager (e.g. yabai's `external_bar`).
-- **Linux tools.** `Process` puts `compat/bin` first on `PATH`, so commands
-  such as `wl-copy`, `wl-paste` and `notify-send` map to `pbcopy`, `pbpaste`
-  and macOS notifications.
+- **Linux tools.** `Process` puts the bundle's `compat/bin` first on `PATH`:
+  - `wl-copy` / `wl-paste`, including `--sensitive` (marked concealed, so
+    clipboard managers skip it), `--clear`, `--type` and `--watch` (so
+    `wl-paste --watch cliphist store` keeps a history; build `cliphist` with
+    `go install go.senan.xyz/cliphist@latest`)
+  - `notify-send` -> macOS notifications
+  - `systemctl suspend|hibernate|reboot|poweroff|is-active` -> `pmset` / System Events
+  - `loginctl lock-session|kill-session` -> lock screen / log out
+- **Permissions.** `qs` is an app bundle (`qs.app`, no Dock icon) so macOS
+  can ask for Location (Wi-Fi names) and Bluetooth access. Builds are ad-hoc
+  signed, so a rebuild may ask again.
 - **Hot reload.** Every QML/qmldir/JS file the shell loads is watched,
   including ones imported from other directories. A failed reload keeps the
   running config.
@@ -47,7 +57,7 @@ Needs Qt 6.5+ and CMake.
 brew install qt cmake ninja
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=$(brew --prefix qt)
 cmake --build build
-cmake --install build --prefix ~/.local   # ~/.local/bin/qs
+cmake --install build --prefix ~/.local   # ~/.local/Applications/qs.app, ~/.local/bin/qs
 ```
 
 ## Use

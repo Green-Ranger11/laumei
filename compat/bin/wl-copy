@@ -1,15 +1,27 @@
 #!/bin/sh
-# wl-copy -> pbcopy. Text after the options (or after --) is copied;
-# otherwise stdin is. Options other than --clear are accepted and ignored.
-clear=0
+# wl-copy on macOS. Copies the text after the options, or stdin.
+# --sensitive marks the copy concealed so clipboard history skips it;
+# --clear empties the clipboard; --type picks the MIME type.
+helper="$(dirname "$0")/qs-compat"
+sensitive=""
+type="text/plain"
 while [ $# -gt 0 ]; do
     case "$1" in
         --) shift; break ;;
-        -c|--clear) clear=1; shift ;;
-        -t|--type|-s|--seat) shift 2 ;;
+        -c|--clear) exec "$helper" clip-clear ;;
+        --sensitive) sensitive=--sensitive; shift ;;
+        -t|--type) type="$2"; shift 2 ;;
+        --type=*) type="${1#*=}"; shift ;;
+        -s|--seat) shift 2 ;;
         -*) shift ;;
         *) break ;;
     esac
 done
-if [ "$clear" = 1 ]; then printf '' | pbcopy; exit 0; fi
-if [ $# -gt 0 ]; then printf '%s' "$*" | pbcopy; else pbcopy; fi
+if [ $# -gt 0 ]; then
+    printf '%s' "$*" | "$helper" clip-copy --type "$type" $sensitive
+else
+    # stdin may be binary (an image from cliphist decode): let the helper
+    # sniff it unless a type was given.
+    if [ "$type" = text/plain ]; then exec "$helper" clip-copy $sensitive; fi
+    exec "$helper" clip-copy --type "$type" $sensitive
+fi

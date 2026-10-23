@@ -1,0 +1,11 @@
+#!/bin/sh
+# systemctl on macOS: the power verbs, and is-active (always "inactive":
+# there are no systemd units). Everything else fails like a missing unit.
+case "$1" in
+    suspend|hibernate|hybrid-sleep|suspend-then-hibernate) exec /usr/bin/pmset sleepnow ;;
+    reboot) exec /usr/bin/osascript -e 'tell application "System Events" to restart' ;;
+    poweroff|halt) exec /usr/bin/osascript -e 'tell application "System Events" to shut down' ;;
+    is-active) echo inactive; exit 3 ;;
+    is-enabled) echo disabled; exit 1 ;;
+    *) echo "systemctl: '$1' is not available on macOS" >&2; exit 1 ;;
+esac
