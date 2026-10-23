@@ -1,5 +1,5 @@
-qt_add_library(qs_io STATIC)
-qt_add_qml_module(qs_io
+qt_add_library(laumei_io STATIC)
+qt_add_qml_module(laumei_io
     URI Quickshell.Io
     VERSION 1.0
     SOURCES
@@ -11,5 +11,5 @@ qt_add_qml_module(qs_io
         objectmodel.h
         procfs.mm procfs.h
 )
-target_include_directories(qs_io PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(qs_io PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework Foundation")
+target_include_directories(laumei_io PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(laumei_io PUBLIC Qt6::Core Qt6::Qml "-framework IOKit" "-framework Foundation")

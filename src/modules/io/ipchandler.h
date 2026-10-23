@@ -7,7 +7,7 @@
 #include <QtQml/qqmlregistration.h>
 
 // Quickshell.Io IpcHandler: exposes the functions declared on it to
-// `qs ipc call <target> <function> [args...]`.
+// `laumei ipc call <target> <function> [args...]`.
 class IpcHandler : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -23,7 +23,7 @@ public:
     bool enabled() const { return mEnabled; }
     void setEnabled(bool e);
 
-    // "function name(arg: type, ...): returnType" lines for `qs ipc show`.
+    // "function name(arg: type, ...): returnType" lines for `laumei ipc show`.
     QStringList describeFunctions() const;
 
     // Calls `function` with string arguments coerced to its declared parameter

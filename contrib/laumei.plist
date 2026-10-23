@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Starts `qs -c CONFIG` at login and restarts it if it crashes.
+  Starts `laumei -c CONFIG` at login and restarts it if it crashes.
   Install: sed "s|@HOME@|$HOME|g; s|@CONFIG@|mac|g" contrib/laumei.plist \
              > ~/Library/LaunchAgents/laumei.plist
            launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/laumei.plist
@@ -12,7 +12,7 @@
     <string>laumei</string>
     <key>ProgramArguments</key>
     <array>
-        <string>@HOME@/.local/bin/qs</string>
+        <string>@HOME@/.local/bin/laumei</string>
         <string>-c</string>
         <string>@CONFIG@</string>
     </array>

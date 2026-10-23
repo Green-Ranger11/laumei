@@ -230,7 +230,7 @@ Networking::Networking(QObject* parent) : QObject(parent), mDevices(new ObjectMo
     const CLAuthorizationStatus status = location.authorizationStatus;
     if (status == kCLAuthorizationStatusNotDetermined) [location requestWhenInUseAuthorization];
     else if (status != kCLAuthorizationStatusAuthorizedAlways)
-        qWarning("Networking: no Location access, so Wi-Fi network names are hidden. Allow qs in "
+        qWarning("Networking: no Location access, so Wi-Fi network names are hidden. Allow Laumei in "
                  "System Settings > Privacy & Security > Location Services.");
     mLocation = location;
 

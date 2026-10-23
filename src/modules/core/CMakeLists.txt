@@ -1,7 +1,7 @@
 set_source_files_properties(Quickshell.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-qt_add_library(qs_core STATIC)
-qt_add_qml_module(qs_core
+qt_add_library(laumei_core STATIC)
+qt_add_qml_module(laumei_core
     URI Quickshell
     VERSION 1.0
     SOURCES
@@ -29,6 +29,6 @@ qt_add_qml_module(qs_core
         QtQuick
         Quickshell.Wayland
 )
-target_include_directories(qs_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(qs_core PUBLIC Qt6::Gui Qt6::Qml Qt6::Quick qs_io qs_wayland
+target_include_directories(laumei_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(laumei_core PUBLIC Qt6::Gui Qt6::Qml Qt6::Quick laumei_io laumei_wayland
     "-framework AppKit" "-framework Foundation")

@@ -4,7 +4,7 @@
 #include <QLocalServer>
 #include <QString>
 
-// Local-socket IPC between a running shell and `qs ipc ...` / `qs kill`.
+// Local-socket IPC between a running shell and `laumei ipc ...` / `laumei kill`.
 // One JSON request per connection, one JSON reply.
 namespace Ipc {
 

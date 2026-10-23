@@ -1,7 +1,7 @@
 #!/bin/sh
 # loginctl on macOS: lock and log out.
 case "$1" in
-    lock-session|lock-sessions) exec "$(dirname "$0")/qs-compat" lock ;;
+    lock-session|lock-sessions) exec "$(dirname "$0")/laumei-compat" lock ;;
     kill-session|terminate-session|terminate-user)
         # loginwindow's "really log out" event: no confirmation dialog.
         exec /usr/bin/osascript -e 'tell application "loginwindow" to «event aevtrlgo»' ;;

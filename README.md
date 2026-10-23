@@ -1,13 +1,12 @@
 # Laumei
 
-*Laumei* is Samoan for turtle: a creature that carries its shell with it.
-
 Run [Quickshell](https://quickshell.org) configs on macOS.
 
 Quickshell is Linux-only (Wayland/X11). This is a separate runtime that
 provides Quickshell's QML modules on top of plain Qt, so QML written for
-Quickshell loads unchanged where macOS can host it. It installs a `qs` binary
-with the same CLI.
+Quickshell loads unchanged where macOS can host it. It installs a `laumei`
+command with the same CLI, plus a `qs` alias so configs that call Quickshell's
+`qs` keep working.
 
 ## Status
 
@@ -51,7 +50,7 @@ macOS 27, which draws all menu-bar items as one window), `Services.Pam`,
   - `systemctl suspend|hibernate|reboot|poweroff|is-active` -> `pmset` / System Events
   - `loginctl lock-session|kill-session` -> lock screen / log out
   - `systemd-inhibit` -> `caffeinate`
-- **Permissions.** `qs` lives in an app bundle (`Laumei.app`, no Dock icon) so macOS
+- **Permissions.** Laumei is an app bundle (`Laumei.app`, no Dock icon) so macOS
   can ask for Location (Wi-Fi names) and Bluetooth access. Builds are ad-hoc
   signed, so a rebuild may ask again.
 - **Hot reload.** Every QML/qmldir/JS file the shell loads is watched,
@@ -66,22 +65,22 @@ Needs Qt 6.5+ and CMake.
 brew install qt cmake ninja
 cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=$(brew --prefix qt)
 cmake --build build
-cmake --install build --prefix ~/.local   # ~/.local/Applications/Laumei.app, ~/.local/bin/qs
+cmake --install build --prefix ~/.local   # ~/.local/Applications/Laumei.app, ~/.local/bin/{laumei,qs}
 ```
 
 ## Use
 
 ```sh
-qs -c mac                               # ~/.config/quickshell/mac/shell.qml
-qs -p path/to/shell.qml                 # or a directory holding one
-qs -c mac ipc show                      # list IpcHandler targets
-qs -c mac ipc call launcher toggle
-qs -c mac kill
+laumei -c mac                           # ~/.config/quickshell/mac/shell.qml
+laumei -p path/to/shell.qml             # or a directory holding one
+laumei -c mac ipc show                  # list IpcHandler targets
+laumei -c mac ipc call launcher toggle
+laumei -c mac kill
 ```
 
 Run it at login with the LaunchAgent in `contrib/` (instructions inside).
 
-If you use yabai, tell it to leave `qs` windows alone:
+If you use yabai, tell it to leave Laumei's windows alone:
 
 ```sh
 yabai -m rule --add app="^Laumei$" manage=off

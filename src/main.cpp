@@ -1,9 +1,10 @@
-// qs: run a Quickshell config on macOS, or talk to a running one.
+// laumei: run a Quickshell config on macOS, or talk to a running one.
+// Also installed as `qs`, the name Quickshell configs call.
 //
-//   qs [-p <path> | -c <name>] [--replace]       run the shell
-//   qs [-p <path> | -c <name>] ipc show          list IPC targets
-//   qs [-p <path> | -c <name>] ipc call <target> <function> [args...]
-//   qs [-p <path> | -c <name>] kill              stop the running shell
+//   laumei [-p <path> | -c <name>] [--replace]       run the shell
+//   laumei [-p <path> | -c <name>] ipc show          list IPC targets
+//   laumei [-p <path> | -c <name>] ipc call <target> <function> [args...]
+//   laumei [-p <path> | -c <name>] kill              stop the running shell
 //
 // <path> is a shell.qml or a directory holding one; -c <name> means
 // ~/.config/quickshell/<name>. Default: ~/.config/quickshell/shell.qml.
@@ -49,10 +50,10 @@ Q_IMPORT_QML_PLUGIN(Quickshell_Services_MprisPlugin)
 namespace {
 
 void usage() {
-    std::fputs("usage: qs [-p <path> | -c <name>] [--replace]\n"
-               "       qs [-p <path> | -c <name>] ipc show\n"
-               "       qs [-p <path> | -c <name>] ipc call <target> <function> [args...]\n"
-               "       qs [-p <path> | -c <name>] kill\n",
+    std::fputs("usage: laumei [-p <path> | -c <name>] [--replace]\n"
+               "       laumei [-p <path> | -c <name>] ipc show\n"
+               "       laumei [-p <path> | -c <name>] ipc call <target> <function> [args...]\n"
+               "       laumei [-p <path> | -c <name>] kill\n",
                stderr);
 }
 
@@ -193,7 +194,7 @@ int main(int argc, char** argv) {
         return runClient(rest);
     }
 
-    // Started through a symlink (~/.local/bin/qs), macOS doesn't tie the
+    // Started through a symlink (~/.local/bin/laumei or qs), macOS doesn't tie the
     // process to Laumei.app: no bundle id, so no Location/Bluetooth prompts.
     // Re-exec from the real path inside the bundle.
     {

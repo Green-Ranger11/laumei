@@ -13,7 +13,7 @@ QString shellPath();
 QString shellDir();
 
 // Stable id for the loaded shell (hash of its path), shared by the state/cache
-// dirs and the IPC socket so `qs -p <dir> ipc` finds the right instance.
+// dirs and the IPC socket so `laumei -p <dir> ipc` finds the right instance.
 QString shellId();
 
 // ~/.local/state/quickshell/by-shell/<id>, like Quickshell on Linux.

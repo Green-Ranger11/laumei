@@ -2,7 +2,7 @@
 # wl-copy on macOS. Copies the text after the options, or stdin.
 # --sensitive marks the copy concealed so clipboard history skips it;
 # --clear empties the clipboard; --type picks the MIME type.
-helper="$(dirname "$0")/qs-compat"
+helper="$(dirname "$0")/laumei-compat"
 sensitive=""
 type="text/plain"
 while [ $# -gt 0 ]; do

@@ -1,12 +1,12 @@
-// qs-compat: the native half of the compat/bin shims (wl-copy, wl-paste,
+// laumei-compat: the native half of the compat/bin shims (wl-copy, wl-paste,
 // loginctl). Not meant to be called directly.
 //
-//   qs-compat clip-copy [--sensitive] [--type <mime>]   stdin -> clipboard
-//   qs-compat clip-clear
-//   qs-compat clip-paste [--type <mime>]                clipboard -> stdout
-//   qs-compat clip-types                                one MIME type per line
-//   qs-compat clip-watch <command...>                   run command per change
-//   qs-compat lock                                      lock the screen now
+//   laumei-compat clip-copy [--sensitive] [--type <mime>]   stdin -> clipboard
+//   laumei-compat clip-clear
+//   laumei-compat clip-paste [--type <mime>]                clipboard -> stdout
+//   laumei-compat clip-types                                one MIME type per line
+//   laumei-compat clip-watch <command...>                   run command per change
+//   laumei-compat lock                                      lock the screen now
 
 #import <AppKit/AppKit.h>
 #include <dlfcn.h>
@@ -117,14 +117,14 @@ void runWith(char** argv, NSData* data) {
     }
     close(fds[1]);
     if (rc == 0) waitpid(pid, nullptr, 0);
-    else fprintf(stderr, "qs-compat: cannot run %s\n", argv[0]);
+    else fprintf(stderr, "laumei-compat: cannot run %s\n", argv[0]);
 }
 
 // wl-paste --watch: macOS posts no clipboard notifications, so poll the
 // change counter (a cheap integer read) four times a second.
 int clipWatch(int argc, char** argv) {
     if (argc < 1) {
-        fputs("qs-compat clip-watch: missing command\n", stderr);
+        fputs("laumei-compat clip-watch: missing command\n", stderr);
         return 2;
     }
     signal(SIGPIPE, SIG_IGN);
@@ -165,7 +165,7 @@ int lock() {
 int main(int argc, char** argv) {
     @autoreleasepool {
         if (argc < 2) {
-            fputs("usage: qs-compat clip-copy|clip-clear|clip-paste|clip-types|clip-watch|lock ...\n", stderr);
+            fputs("usage: laumei-compat clip-copy|clip-clear|clip-paste|clip-types|clip-watch|lock ...\n", stderr);
             return 2;
         }
         const char* cmd = argv[1];
@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
         if (!strcmp(cmd, "clip-types")) return clipTypes();
         if (!strcmp(cmd, "clip-watch")) return clipWatch(argc - 2, argv + 2);
         if (!strcmp(cmd, "lock")) return lock();
-        fprintf(stderr, "qs-compat: unknown command %s\n", cmd);
+        fprintf(stderr, "laumei-compat: unknown command %s\n", cmd);
         return 2;
     }
 }
