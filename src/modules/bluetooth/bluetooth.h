@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QObject>
+#include <QProcess>
+#include <QSet>
 #include <QTimer>
 #include <QtQml/qqmlregistration.h>
 
@@ -141,6 +143,11 @@ public:
     void refresh();
     void removeDevice(BluetoothDevice* d);
 
+    // Addresses macOS reports as connected (see refreshConnections()).
+    bool isConnected(const QString& address) const { return mConnected.contains(address); }
+    // Re-reads the connected set now, e.g. after a connect or disconnect.
+    void refreshConnections();
+
 signals:
     void enabledChanged();
     void discoveringChanged();
@@ -152,6 +159,9 @@ private:
 
     ObjectModel* mDevices;
     QTimer mPoll;
+    QProcess mProfiler;
+    QSet<QString> mConnected;
+    bool mRefreshConnectionsAgain = false;
     void* mInquiry = nullptr;
     void* mInquiryDelegate = nullptr;
     void* mConnectNotification = nullptr;

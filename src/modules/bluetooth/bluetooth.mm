@@ -1,5 +1,9 @@
 #include "bluetooth.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
 #import <IOBluetooth/IOBluetooth.h>
 
 // Controller power and discoverability have no public API; these IOBluetooth
@@ -162,8 +166,11 @@ void BluetoothDevice::refresh() {
         mName = n;
         emit nameChanged();
     }
+    // IOBluetooth's isConnected reports false for connected devices on recent
+    // macOS; the adapter's system_profiler snapshot is the source of truth.
+    const bool isUp = mAdapter->isConnected(mAddress) || d.isConnected;
     if (mState != BluetoothDeviceState::Connecting && mState != BluetoothDeviceState::Disconnecting)
-        setState(d.isConnected ? BluetoothDeviceState::Connected : BluetoothDeviceState::Disconnected);
+        setState(isUp ? BluetoothDeviceState::Connected : BluetoothDeviceState::Disconnected);
     if (bool p = d.isPaired; p != mPaired) {
         mPaired = p;
         emit pairedChanged();
@@ -180,16 +187,19 @@ void BluetoothDevice::connect() {
     if ([io(mDevice) openConnection:static_cast<id>(mDelegate)] != kIOReturnSuccess) connectFinished(false);
 }
 
-void BluetoothDevice::connectFinished(bool) {
-    setState(io(mDevice).isConnected ? BluetoothDeviceState::Connected : BluetoothDeviceState::Disconnected);
+void BluetoothDevice::connectFinished(bool ok) {
+    // Optimistic until the next snapshot confirms it either way.
+    setState(ok ? BluetoothDeviceState::Connected : BluetoothDeviceState::Disconnected);
+    mAdapter->refreshConnections();
 }
 
 void BluetoothDevice::disconnect() {
     if (!connected()) return;
     setState(BluetoothDeviceState::Disconnecting);
     [io(mDevice) closeConnection];
-    // No completion callback for closeConnection; the poll picks up the rest.
-    setState(io(mDevice).isConnected ? BluetoothDeviceState::Connected : BluetoothDeviceState::Disconnected);
+    // No completion callback for closeConnection; the snapshot confirms it.
+    setState(BluetoothDeviceState::Disconnected);
+    mAdapter->refreshConnections();
 }
 
 void BluetoothDevice::pair() {
@@ -242,10 +252,29 @@ BluetoothAdapter::BluetoothAdapter(QObject* parent) : QObject(parent), mDevices(
 
     // Power state, pairings and disconnects have no notifications worth the
     // trouble; these reads are cheap.
-    mPoll.setInterval(2000);
+    mPoll.setInterval(3000);
     QObject::connect(&mPoll, &QTimer::timeout, this, &BluetoothAdapter::refresh);
+    QObject::connect(&mPoll, &QTimer::timeout, this, &BluetoothAdapter::refreshConnections);
     mPoll.start();
+
+    QObject::connect(&mProfiler, &QProcess::finished, this, [this](int code) {
+        const QByteArray out = mProfiler.readAllStandardOutput();
+        if (code == 0) {
+            QSet<QString> connected;
+            const QJsonObject bt = QJsonDocument::fromJson(out).object().value("SPBluetoothDataType").toArray().at(0).toObject();
+            for (const auto& entry : bt.value("device_connected").toArray())
+                for (const auto& dev : entry.toObject())
+                    connected.insert(dev.toObject().value("device_address").toString().toUpper());
+            mConnected = connected;
+            refresh();
+        }
+        if (mRefreshConnectionsAgain) {
+            mRefreshConnectionsAgain = false;
+            refreshConnections();
+        }
+    });
     refresh();
+    refreshConnections();
 }
 
 BluetoothAdapter::~BluetoothAdapter() {
@@ -298,6 +327,15 @@ void BluetoothAdapter::refresh() {
     } else {
         for (QObject* o : mDevices->values()) static_cast<BluetoothDevice*>(o)->refresh();
     }
+}
+
+// system_profiler asks bluetoothd, which knows what's connected; ~0.2s.
+void BluetoothAdapter::refreshConnections() {
+    if (mProfiler.state() != QProcess::NotRunning) {
+        mRefreshConnectionsAgain = true;
+        return;
+    }
+    mProfiler.start("/usr/sbin/system_profiler", {"SPBluetoothDataType", "-json"});
 }
 
 void BluetoothAdapter::setEnabled(bool e) {
