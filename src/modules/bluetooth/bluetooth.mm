@@ -3,6 +3,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QThread>
 
 #import <IOBluetooth/IOBluetooth.h>
 
@@ -295,6 +296,16 @@ BluetoothDevice* BluetoothAdapter::find(void* ioDevice) const {
 }
 
 void BluetoothAdapter::deviceSeen(void* ioDevice) {
+    // IOBluetooth can call back off the main thread; a device created there
+    // can't be bound from QML (qFatal "different thread than the QML engine").
+    if (QThread::currentThread() != thread()) {
+        [io(ioDevice) retain];
+        QMetaObject::invokeMethod(this, [this, ioDevice] {
+            deviceSeen(ioDevice);
+            [io(ioDevice) release];
+        }, Qt::QueuedConnection);
+        return;
+    }
     if (auto* d = find(ioDevice)) d->refresh();
     else mDevices->append(new BluetoothDevice(ioDevice, this));
 }
