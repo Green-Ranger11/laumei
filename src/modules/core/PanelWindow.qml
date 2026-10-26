@@ -30,7 +30,10 @@ Window {
     property bool _completed: false
     property bool _screenPinned: false
     property bool _tookFocus: false
-    onScreenChanged: if (!_completed) _screenPinned = true
+    // After completion a screen change means Qt moved the window to another
+    // display, which can rebuild the NSWindow without its level and spaces
+    // settings: apply them again.
+    onScreenChanged: if (!_completed) _screenPinned = true; else Qt.callLater(_shown)
 
     function _targetScreen() {
         // A Variants delegate over Quickshell.screens (one bar per display):
