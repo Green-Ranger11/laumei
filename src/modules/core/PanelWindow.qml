@@ -33,6 +33,11 @@ Window {
     onScreenChanged: if (!_completed) _screenPinned = true
 
     function _targetScreen() {
+        // A Variants delegate over Quickshell.screens (one bar per display):
+        // its modelData is the screen. Qt may already have moved `screen` to
+        // the display under the mouse, and binding it to the screen it
+        // started on sends no change.
+        if (Qt.application.screens.indexOf(win.modelData) >= 0) return win.modelData;
         return _screenPinned ? screen : Qt.application.screens[QsNative.cursorScreenIndex()];
     }
 
