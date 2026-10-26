@@ -37,7 +37,7 @@ Window {
         // its modelData is the screen. Qt may already have moved `screen` to
         // the display under the mouse, and binding it to the screen it
         // started on sends no change.
-        if (Qt.application.screens.indexOf(win.modelData) >= 0) return win.modelData;
+        if ("modelData" in win && Qt.application.screens.indexOf(win.modelData) >= 0) return win.modelData;
         return _screenPinned ? screen : Qt.application.screens[QsNative.cursorScreenIndex()];
     }
 
