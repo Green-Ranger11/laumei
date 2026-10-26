@@ -168,9 +168,16 @@ Hyprland::Snapshot Hyprland::parseYabai(const QByteArray& out) const {
         snap.monitors.append({d.value("index").toInt(), displayName(d.value("id").toInteger()),
                               d.value("has-focus").toBool()});
     }
+    // A space labelled ws<N> is workspace N wherever it sits; yabai's own
+    // indexes run display by display, so "2 on the external monitor" needs one.
+    static const QRegularExpression wsLabel(R"re(^ws(\d+)$)re");
+    QHash<int, int> idOfIndex;
     for (const auto& v : QJsonDocument::fromJson(parts[0]).array()) {
         const QJsonObject s = v.toObject();
-        const int id = s.value("index").toInt();
+        const int index = s.value("index").toInt();
+        const auto m = wsLabel.match(s.value("label").toString());
+        const int id = m.hasMatch() ? m.captured(1).toInt() : index;
+        idOfIndex[index] = id;
         snap.workspaces.append({id, QString::number(id), s.value("display").toInt(), s.value("is-visible").toBool(),
                                 s.value("has-focus").toBool()});
     }
@@ -179,7 +186,8 @@ Hyprland::Snapshot Hyprland::parseYabai(const QByteArray& out) const {
         if (w.value("is-minimized").toBool() || w.value("is-hidden").toBool()) continue;
         if (w.value("subrole").toString() != "AXStandardWindow") continue;
         if (w.value("pid").toInteger() == QCoreApplication::applicationPid()) continue; // our own panels
-        snap.windows.append({w.value("id").toInt(), w.value("space").toInt(), w.value("app").toString(),
+        const int space = w.value("space").toInt();
+        snap.windows.append({w.value("id").toInt(), idOfIndex.value(space, space), w.value("app").toString(),
                              w.value("title").toString(), w.value("has-focus").toBool()});
     }
     snap.valid = true;
@@ -330,10 +338,12 @@ void Hyprland::dispatch(const QString& request) {
     else if (target.endsWith("-1")) sel = "prev";
 
     if (mBackend == Backend::Yabai) {
-        if (verb == "workspace") runDetached("yabai -m space --focus \"$1\"", {sel});
-        else if (verb == "movetoworkspacesilent") runDetached("yabai -m window --space \"$1\"", {sel});
+        // Workspace N is the space labelled wsN if there is one, else index N.
+        const QString space = R"(s="$1"; case "$s" in *[!0-9]*) ;; *) yabai -m query --spaces --space "ws$s" >/dev/null 2>&1 && s="ws$s";; esac; )";
+        if (verb == "workspace") runDetached(space + "yabai -m space --focus \"$s\"", {sel});
+        else if (verb == "movetoworkspacesilent") runDetached(space + "yabai -m window --space \"$s\"", {sel});
         // Move, then follow; one shell so the focus waits for the move.
-        else runDetached("yabai -m window --space \"$1\" && yabai -m space --focus \"$1\"", {sel});
+        else runDetached(space + "yabai -m window --space \"$s\" && yabai -m space --focus \"$s\"", {sel});
     } else {
         if (verb == "workspace") runDetached("aerospace workspace \"$1\"", {sel});
         else if (verb == "movetoworkspacesilent") runDetached("aerospace move-node-to-workspace \"$1\"", {sel});

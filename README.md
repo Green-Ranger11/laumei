@@ -62,6 +62,9 @@ translated.
 `Quickshell.Hyprland` uses yabai when it's installed, otherwise AeroSpace; set
 `LAUMEI_WM=yabai` or `LAUMEI_WM=aerospace` to choose. yabai reports changes
 through signals Laumei registers on start; AeroSpace is polled once a second.
+A yabai space labelled `ws<N>` (`yabai -m space --label ws2`) is workspace N
+wherever it sits, so a workspace can live on another display; unlabelled spaces
+use their yabai index.
 AeroSpace workspaces named with a number keep it as their id; others are
 numbered from 1000 and keep their name.
 
