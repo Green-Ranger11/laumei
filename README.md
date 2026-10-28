@@ -51,14 +51,14 @@ translated.
   (also from scripts, via the compat `hyprctl dispatch`); others are logged
   and ignored.
 - **Notifications:** a `NotificationServer` receives `notify-send` from the
-  shell's own scripts. Other apps post to Notification Center, which macOS
+  shell's own scripts, including actions (`-A`, with the invoked one printed
+  as on Linux), `-w` and `-r` replacement in place. Other apps post to Notification Center, which macOS
   doesn't let another app replace, so their banners stay macOS's. With
   `LAUMEI_NC_BRIDGE=1` Laumei also copies them into the server (for a
   history list) by reading Notification Center's database, which needs Full
   Disk Access. Copies carry the hint `x-laumei-notification-center` (macOS
   already showed a banner) and a `default` action that opens the app, not
-  the specific message. No actions, `-r` replacement or images from
-  `notify-send`.
+  the specific message.
 
 ## Status
 

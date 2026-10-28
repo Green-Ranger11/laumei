@@ -14,8 +14,8 @@ QString socketPath();
 // Starts listening. Returns false if another live instance owns the socket.
 bool listen(QLocalServer* server);
 
-// Sends `request` to the running instance; `reply` gets its answer. Returns
-// false if no instance is running.
-bool send(const QJsonObject& request, QJsonObject* reply);
+// Sends `request` to the running instance; `reply` gets its answer, waited
+// for up to `timeoutMs` (-1: forever). Returns false if no instance is running.
+bool send(const QJsonObject& request, QJsonObject* reply, int timeoutMs = 5000);
 
 } // namespace Ipc

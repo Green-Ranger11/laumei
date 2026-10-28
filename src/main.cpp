@@ -149,10 +149,11 @@ private:
     QTimer mDebounce;
 };
 
-// notify-send's arguments as a Notification's fields. Actions, waiting and
-// replacing (-A, -w, -r) are accepted and ignored. Empty if malformed.
-QJsonObject parseNotifySend(const QStringList& args, bool* printId) {
+// notify-send's arguments as a Notification's fields. -A/-w set *wait (the
+// reply comes when an action is invoked or it closes). Empty if malformed.
+QJsonObject parseNotifySend(const QStringList& args, bool* printId, bool* wait) {
     QJsonObject n{{"urgency", 1}}, hints;
+    QJsonArray actions;
     QStringList positional;
     for (int i = 0; i < args.size(); i++) {
         QString opt = args[i], value;
@@ -166,6 +167,7 @@ QJsonObject parseNotifySend(const QStringList& args, bool* printId) {
         if (flags.contains(opt)) {
             if (opt == "-p" || opt == "--print-id") *printId = true;
             if (opt == "-e" || opt == "--transient") n["transient"] = true;
+            if (opt == "-w" || opt == "--wait") *wait = true;
             continue;
         }
         if (value.isNull()) {
@@ -176,6 +178,13 @@ QJsonObject parseNotifySend(const QStringList& args, bool* printId) {
         else if (opt == "-i" || opt == "--icon") n["appIcon"] = value;
         else if (opt == "-t" || opt == "--expire-time") n["expireTimeout"] = value.toDouble() / 1000;
         else if (opt == "-c" || opt == "--category") hints["category"] = value;
+        else if (opt == "-r" || opt == "--replace-id") n["replacesId"] = value.toInt();
+        else if (opt == "-A" || opt == "--action") {
+            // [NAME=]Text; unnamed actions are numbered from 0.
+            const int eq = value.indexOf('=');
+            actions.append(QJsonArray{eq > 0 ? value.left(eq) : QString::number(actions.size()), value.mid(eq + 1)});
+            *wait = true;
+        }
         else if (opt == "-u" || opt == "--urgency")
             n["urgency"] = value == "low" ? 0 : value == "critical" ? 2 : 1;
         else if (opt == "-h" || opt == "--hint") {
@@ -191,12 +200,13 @@ QJsonObject parseNotifySend(const QStringList& args, bool* printId) {
     n["summary"] = positional[0];
     n["body"] = positional.value(1);
     n["hints"] = hints;
+    n["actions"] = actions;
     return n;
 }
 
 int runClient(const QStringList& rest) {
     QJsonObject req;
-    bool printId = false;
+    bool printId = false, wait = false;
     if (rest.value(0) == "hyprctl") {
         // Only dispatch: it runs window manager commands, no shell needed.
         if (rest.value(1) != "dispatch" || rest.size() < 3) {
@@ -207,12 +217,12 @@ int runClient(const QStringList& rest) {
     }
     if (rest.value(0) == "kill") req = {{"cmd", "kill"}};
     else if (rest.value(0) == "notify-send") {
-        const QJsonObject n = parseNotifySend(rest.mid(1), &printId);
+        const QJsonObject n = parseNotifySend(rest.mid(1), &printId, &wait);
         if (n.isEmpty()) {
             usage();
             return 2;
         }
-        req = {{"cmd", "notify"}, {"notification", n}};
+        req = {{"cmd", "notify"}, {"notification", n}, {"wait", wait}};
     }
     else if (rest.value(0) == "ipc" && rest.value(1) == "show") req = {{"cmd", "show"}};
     else if (rest.value(0) == "ipc" && rest.value(1) == "call" && rest.size() >= 4)
@@ -224,7 +234,7 @@ int runClient(const QStringList& rest) {
     }
 
     QJsonObject reply;
-    if (!Ipc::send(req, &reply)) {
+    if (!Ipc::send(req, &reply, wait ? -1 : 5000)) {
         std::fprintf(stderr, "no running instance for %s\n", qPrintable(QsPaths::shellPath()));
         return 1;
     }
@@ -241,6 +251,8 @@ int runClient(const QStringList& rest) {
     }
     if (const QString r = reply.value("result").toString(); !r.isEmpty()) std::printf("%s\n", qPrintable(r));
     if (printId) std::printf("%d\n", reply.value("id").toInt());
+    // notify-send -A prints the invoked action's name.
+    if (const QString a = reply.value("action").toString(); !a.isEmpty()) std::printf("%s\n", qPrintable(a));
     return 0;
 }
 

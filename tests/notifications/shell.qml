@@ -1,5 +1,5 @@
-// NotificationServer fed by the compat notify-send, and the tracked /
-// dismissed lifecycle.
+// NotificationServer fed by the compat notify-send: the tracked / dismissed
+// lifecycle, replacing (-r) and actions with a waiting sender (-A).
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -15,11 +15,10 @@ ShellRoot {
     property NotificationServer server: NotificationServer {
         onNotification: n => {
             root.received = root.received.concat([n]);
-            // Keep only the first one.
-            if (root.received.length === 1) {
-                n.tracked = true;
-                n.closed.connect(reason => root.closedReason = reason);
-            }
+            // Keep the first one and the one with actions.
+            if (root.received.length === 1 || n.summary === "Ask") n.tracked = true;
+            if (root.received.length === 1) n.closed.connect(reason => root.closedReason = reason);
+            if (n.summary === "Ask") Qt.callLater(() => n.actions.find(a => a.identifier === "yes").invoke());
         }
     }
 
@@ -36,21 +35,32 @@ ShellRoot {
 
     property Process sendSecond: Process {
         command: ["notify-send", "Dropped"]
+        onExited: root.replace.running = true
+    }
+
+    property Process replace: Process {
+        command: ["notify-send", "-r", "1", "Hello again"]
+        onExited: root.ask.running = true
+    }
+
+    property Process ask: Process {
+        command: ["notify-send", "-A", "yes=Yes", "-A", "No", "Ask"]
+        stdout: StdioCollector { id: answer }
         onExited: root.check()
     }
 
     function check() {
-        t.check("received both", received.length === 2, received.length);
+        t.check("replace sends no new notification", received.length === 3, received.length);
         const n = received[0];
-        t.check("summary", n.summary === "Hello", n.summary);
-        t.check("body", n.body === "Body text", n.body);
-        t.check("appName", n.appName === "Tests", n.appName);
-        t.check("urgency", n.urgency === NotificationUrgency.Critical, n.urgency);
-        t.check("desktopEntry", n.desktopEntry === "tests", n.desktopEntry);
-        t.check("only the tracked one is kept", server.trackedNotifications.values.length === 1);
+        t.check("replaced in place", n.summary === "Hello again", n.summary);
+        t.check("body", n.body === "", n.body);
+        t.check("appName", n.appName === "", n.appName);
+        t.check("actions", received[2].actions.map(a => a.identifier).join() === "yes,1");
+        t.check("invoked action printed", answer.text.trim() === "yes", JSON.stringify(answer.text));
+        t.check("only tracked are kept", server.trackedNotifications.values.length === 2);
         n.dismiss();
         t.check("dismissed reason", closedReason === NotificationCloseReason.Dismissed, closedReason);
-        t.check("untracked on dismiss", server.trackedNotifications.values.length === 0);
+        t.check("untracked on dismiss", server.trackedNotifications.values.length === 1);
         t.finish();
     }
 

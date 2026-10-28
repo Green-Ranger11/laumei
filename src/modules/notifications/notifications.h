@@ -32,8 +32,11 @@ public:
     Q_ENUM(Enum)
 };
 
-// The only action Laumei makes: "default" on a notification copied from
-// Notification Center, opening the app that posted it.
+class Notification;
+
+// A notify-send -A action, reported back to a waiting notify-send; or the
+// "default" action of a notification copied from Notification Center, which
+// opens the app that posted it.
 class NotificationAction : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -42,8 +45,7 @@ class NotificationAction : public QObject {
     Q_PROPERTY(QString text MEMBER mText CONSTANT)
 
 public:
-    NotificationAction(const QString& bundleId, QObject* parent)
-        : QObject(parent), mIdentifier("default"), mText("Open"), mBundleId(bundleId) {}
+    NotificationAction(const QString& identifier, const QString& text, const QString& bundleId, Notification* parent);
     Q_INVOKABLE void invoke();
 
 private:
@@ -57,24 +59,27 @@ class Notification : public QObject {
     Q_PROPERTY(int id MEMBER mId CONSTANT)
     Q_PROPERTY(bool tracked READ tracked WRITE setTracked NOTIFY trackedChanged)
     Q_PROPERTY(bool lastGeneration MEMBER mFalse CONSTANT)
-    Q_PROPERTY(qreal expireTimeout MEMBER mExpireTimeout CONSTANT)
-    Q_PROPERTY(QString appName MEMBER mAppName CONSTANT)
-    Q_PROPERTY(QString appIcon MEMBER mAppIcon CONSTANT)
-    Q_PROPERTY(QString summary MEMBER mSummary CONSTANT)
-    Q_PROPERTY(QString body MEMBER mBody CONSTANT)
-    Q_PROPERTY(int urgency MEMBER mUrgency CONSTANT)
-    Q_PROPERTY(QList<QObject*> actions MEMBER mActions CONSTANT)
+    Q_PROPERTY(qreal expireTimeout MEMBER mExpireTimeout NOTIFY changed)
+    Q_PROPERTY(QString appName MEMBER mAppName NOTIFY changed)
+    Q_PROPERTY(QString appIcon MEMBER mAppIcon NOTIFY changed)
+    Q_PROPERTY(QString summary MEMBER mSummary NOTIFY changed)
+    Q_PROPERTY(QString body MEMBER mBody NOTIFY changed)
+    Q_PROPERTY(int urgency MEMBER mUrgency NOTIFY changed)
+    Q_PROPERTY(QList<QObject*> actions MEMBER mActions NOTIFY changed)
     Q_PROPERTY(bool hasActionIcons MEMBER mFalse CONSTANT)
     Q_PROPERTY(bool resident MEMBER mFalse CONSTANT)
-    Q_PROPERTY(bool transient MEMBER mTransient CONSTANT)
-    Q_PROPERTY(QString desktopEntry MEMBER mDesktopEntry CONSTANT)
-    Q_PROPERTY(QString image MEMBER mImage CONSTANT)
-    Q_PROPERTY(QVariantMap hints MEMBER mHints CONSTANT)
+    Q_PROPERTY(bool transient MEMBER mTransient NOTIFY changed)
+    Q_PROPERTY(QString desktopEntry MEMBER mDesktopEntry NOTIFY changed)
+    Q_PROPERTY(QString image MEMBER mImage NOTIFY changed)
+    Q_PROPERTY(QVariantMap hints MEMBER mHints NOTIFY changed)
 
 public:
-    // `fields` keys are the property names above, plus bundleId: the app
-    // to open from the default action.
+    // `fields` keys are the property names above, except actions, which is
+    // a list of [identifier, text]; plus bundleId: the app the default
+    // action opens.
     Notification(int id, const QVariantMap& fields, QObject* parent);
+    // Replaces the content in place (notify-send -r).
+    void update(const QVariantMap& fields);
 
     int id() const { return mId; }
     bool tracked() const { return mTracked; }
@@ -84,8 +89,11 @@ public:
     Q_INVOKABLE void dismiss() { close(NotificationCloseReason::Dismissed); }
 
 signals:
+    void changed();
     void trackedChanged();
     void closed(int reason);
+    // For a waiting notify-send.
+    void actionInvoked(const QString& identifier);
 
 private:
     void close(int reason);
@@ -124,8 +132,11 @@ public:
     ObjectModel* trackedNotifications() const { return mTracked; }
 
     // Hands a notification (Notification's property names as keys) to the
-    // newest server. Returns its id, or 0 when the shell has no server.
+    // newest server, or updates the live one `replacesId` names. Returns its
+    // id, or 0 when the shell has no server.
     static int post(const QVariantMap& fields);
+    // A tracked notification by id, or null.
+    static Notification* find(int id);
 
 signals:
     void notification(Notification* notification);

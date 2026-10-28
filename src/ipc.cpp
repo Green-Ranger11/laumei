@@ -5,6 +5,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLocalSocket>
+#include <memory>
+#include <utility>
 
 #include "ipchandler.h"
 #include "macnotify.h"
@@ -51,6 +53,31 @@ QJsonObject handle(const QJsonObject& req) {
     return {{"ok", false}, {"error", "unknown command " + cmd}};
 }
 
+// notify-send -w / -A: answers once the notification's action is invoked
+// or it closes, rather than right away. False if `req` isn't such a request.
+template <typename F> bool waitForNotification(const QJsonObject& req, QLocalSocket* sock, F respond) {
+    if (req.value("cmd").toString() != "notify" || !req.value("wait").toBool()) return false;
+    const QVariantMap fields = req.value("notification").toObject().toVariantMap();
+    const int id = NotificationServer::post(fields);
+    Notification* n = NotificationServer::find(id);
+    if (!n) {
+        // Not kept by the shell (or no server): nothing to wait for.
+        if (!id) MacNotify::post(fields);
+        respond({{"ok", true}, {"id", id}});
+        return true;
+    }
+    auto done = std::make_shared<bool>(false);
+    QObject::connect(n, &Notification::actionInvoked, sock, [=](const QString& action) {
+        if (std::exchange(*done, true)) return;
+        respond({{"ok", true}, {"id", id}, {"action", action}});
+    });
+    QObject::connect(n, &Notification::closed, sock, [=] {
+        if (std::exchange(*done, true)) return;
+        respond({{"ok", true}, {"id", id}});
+    });
+    return true;
+}
+
 } // namespace
 
 namespace Ipc {
@@ -72,24 +99,27 @@ bool listen(QLocalServer* server) {
             QObject::connect(sock, &QLocalSocket::disconnected, sock, &QObject::deleteLater);
             QObject::connect(sock, &QLocalSocket::readyRead, sock, [sock] {
                 if (!sock->canReadLine()) return;
-                const QJsonObject reply = handle(QJsonDocument::fromJson(sock->readLine()).object());
-                sock->write(QJsonDocument(reply).toJson(QJsonDocument::Compact) + '\n');
-                sock->flush();
-                sock->disconnectFromServer();
+                const QJsonObject req = QJsonDocument::fromJson(sock->readLine()).object();
+                auto respond = [sock](const QJsonObject& reply) {
+                    sock->write(QJsonDocument(reply).toJson(QJsonDocument::Compact) + '\n');
+                    sock->flush();
+                    sock->disconnectFromServer();
+                };
+                if (!waitForNotification(req, sock, respond)) respond(handle(req));
             });
         }
     });
     return server->listen(socketPath());
 }
 
-bool send(const QJsonObject& request, QJsonObject* reply) {
+bool send(const QJsonObject& request, QJsonObject* reply, int timeoutMs) {
     QLocalSocket sock;
     sock.connectToServer(socketPath());
     if (!sock.waitForConnected(1000)) return false;
     sock.write(QJsonDocument(request).toJson(QJsonDocument::Compact) + '\n');
     sock.flush();
     while (!sock.canReadLine())
-        if (!sock.waitForReadyRead(5000)) break;
+        if (!sock.waitForReadyRead(timeoutMs)) break;
     *reply = QJsonDocument::fromJson(sock.readLine()).object();
     return true;
 }
