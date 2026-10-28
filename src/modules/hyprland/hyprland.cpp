@@ -89,9 +89,7 @@ void HyprlandMonitor::set(const QString& name, bool focused, HyprlandWorkspace* 
 Hyprland::Hyprland(QObject* parent)
     : QObject(parent), mWorkspaces(new ObjectModel(this)), mMonitors(new ObjectModel(this)),
       mToplevels(new ObjectModel(this)) {
-    const QString wm = qEnvironmentVariable("LAUMEI_WM").toLower();
-    if (wm == "aerospace" || (wm != "yabai" && !onPath("yabai") && onPath("aerospace")))
-        mBackend = Backend::AeroSpace;
+    mBackend = detectBackend();
 
     mDebounce.setSingleShot(true);
     mDebounce.setInterval(40);
@@ -119,6 +117,12 @@ Hyprland::Hyprland(QObject* parent)
     }
     mPoll.start();
     refresh();
+}
+
+Hyprland::Backend Hyprland::detectBackend() {
+    const QString wm = qEnvironmentVariable("LAUMEI_WM").toLower();
+    return wm == "aerospace" || (wm != "yabai" && !onPath("yabai") && onPath("aerospace")) ? Backend::AeroSpace
+                                                                                         : Backend::Yabai;
 }
 
 void Hyprland::installSignals() {
@@ -324,9 +328,13 @@ void Hyprland::apply(const Snapshot& snap) {
 }
 
 void Hyprland::dispatch(const QString& request) {
+    if (dispatchTo(mBackend, request)) mDebounce.start();
+}
+
+bool Hyprland::dispatchTo(Backend backend, const QString& request) {
     static const QRegularExpression luaTarget(R"re(workspace\s*=\s*"?([^",}\s]+)"?)re");
     static const QRegularExpression classic(R"re(^\s*(\w+)\s*(.*?)\s*$)re");
-    const bool yabai = mBackend == Backend::Yabai;
+    const bool yabai = backend == Backend::Yabai;
 
     QString verb, target;
     if (auto m = classic.match(request); m.hasMatch() && !request.contains("hl.")) {
@@ -379,7 +387,7 @@ void Hyprland::dispatch(const QString& request) {
         }
     } else {
         qWarning().noquote() << "Hyprland.dispatch: no equivalent for" << request;
-        return;
+        return false;
     }
-    mDebounce.start();
+    return true;
 }

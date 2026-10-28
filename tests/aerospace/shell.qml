@@ -12,6 +12,8 @@ ShellRoot {
     Component.onCompleted: Hyprland.workspaces
     property FileView log: FileView { path: Quickshell.env("AEROSPACE_MOCK_LOG") ?? ""; printErrors: false }
 
+    property Process hyprctl: Process { command: ["hyprctl", "dispatch", "movefocus", "r"] }
+
     property Timer settle: Timer {
         interval: 1500; running: true
         onTriggered: {
@@ -28,6 +30,7 @@ ShellRoot {
             Hyprland.dispatch("killactive");
             Hyprland.dispatch("movefocus l");
             Hyprland.dispatch("togglefloating");
+            hyprctl.running = true;
             Hyprland.dispatch("hl.dsp.focus({ workspace = 2 })");
             Hyprland.dispatch("movetoworkspace web");
             dispatched.start();
@@ -45,6 +48,7 @@ ShellRoot {
             t.check("killactive", lines.includes("close"));
             t.check("movefocus", lines.includes("focus left"));
             t.check("togglefloating", lines.includes("layout floating tiling"));
+            t.check("hyprctl dispatch", lines.includes("focus right"), JSON.stringify(lines));
             t.finish();
         }
     }

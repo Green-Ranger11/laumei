@@ -23,9 +23,7 @@ translated.
 | System tray (`SystemTray`, `QsMenuAnchor`) | macOS 27 draws every menu-bar item into one shared window, so there are no per-item icons or menus to mirror. |
 | Custom lock screens (`WlSessionLock`, `PamContext`) | Only macOS's own lock screen is trusted (Touch ID, Apple Watch, FileVault). Locking hands off to it; the lock UI is never shown, and `PamContext` never authenticates. |
 | Exclusive zones | A window can't reserve screen space; set it in the window manager (yabai `external_bar`, AeroSpace `outer.top`). |
-| Global shortcuts (`GlobalShortcut`) | Bind keys in skhd (or similar) to `laumei ipc call ...`. |
-| Focus grabs, screencopy, other apps' windows (`HyprlandFocusGrab`, `ScreencopyView`, `ToplevelManager`) | Wayland/Hyprland protocols with no counterpart Laumei can use. |
-| Hyprland beyond workspaces | Laumei maps workspaces and monitors onto yabai/AeroSpace; other dispatchers are logged and ignored. |
+| Screencopy (`ScreencopyView`) | Not built yet (ScreenCaptureKit could back it); the view stays empty. |
 | Switching power profiles | Low Power Mode is readable but needs admin rights to change. |
 
 **Partly:**
@@ -37,6 +35,21 @@ translated.
   for an admin password. `autoconnect` has no effect.
 - **Media:** macOS has one system-wide "Now Playing" session, so there is at
   most one player.
+- **Global shortcuts:** Hyprland binds them in its own config, so Laumei reads
+  `~/.config/laumei/shortcuts`, one per line (`launcher = cmd+space`, or
+  `appid:name = ...` for one appid). Modifiers `cmd` (`super`), `ctrl`,
+  `alt`, `shift`; macOS refuses chords without `cmd` or `ctrl`. Keys go by
+  US layout position.
+- **Focus grabs:** `HyprlandFocusGrab` clears on a click outside its windows,
+  but doesn't hand them keyboard focus.
+- **Other apps' windows:** `ToplevelManager` and `Hyprland.toplevels` list what
+  yabai/AeroSpace report; `activate()` and `close()` work, maximized /
+  minimized / fullscreen aren't tracked.
+- **Hyprland dispatchers:** `workspace`, `movetoworkspace(silent)`,
+  `focuswindow` / `closewindow address:...`, `killactive`, `togglefloating`,
+  `fullscreen`, `movefocus`, `movewindow` and `exec` map onto yabai/AeroSpace
+  (also from scripts, via the compat `hyprctl dispatch`); others are logged
+  and ignored.
 - **Notifications:** a `NotificationServer` receives `notify-send` from the
   shell's own scripts. Other apps post to Notification Center, which macOS
   doesn't let another app replace, so their banners stay macOS's. With
@@ -51,7 +64,7 @@ translated.
 
 | Module | Types | Notes |
 |---|---|---|
-| `Quickshell` | `ShellRoot`, `Scope`, `Singleton`, `Variants`, `LazyLoader`, `PanelWindow`, `FloatingWindow`, `PopupWindow`, `Edges`, `SystemClock`, `Region`, `ExclusionMode`, `DesktopEntries`, `QsMenuAnchor`, `QsMenuHandle`, `Quickshell` singleton (`screens`, `env`, `iconPath`, `execDetached`, `shellDir`, `stateDir`, `reload`, ...) | `DesktopEntries` lists `.app` bundles; `iconPath` resolves app bundles, files and app names. `Region` masks are accepted but ignored. |
+| `Quickshell` | `ShellRoot`, `Scope`, `Singleton`, `Variants`, `LazyLoader`, `PanelWindow`, `FloatingWindow`, `PopupWindow`, `Edges`, `SystemClock`, `Region`, `ExclusionMode`, `DesktopEntries`, `QsMenuAnchor`, `QsMenuHandle`, `Quickshell` singleton (`screens`, `env`, `iconPath`, `execDetached`, `shellDir`, `stateDir`, `reload`, ...) | `DesktopEntries` lists `.app` bundles; `iconPath` resolves app bundles, files and app names. `Region` input masks work: outside the region, clicks reach the window below. |
 | `Quickshell.Io` | `Process`, `StdioCollector`, `SplitParser`, `FileView`, `IpcHandler` | `FileView` synthesizes `/proc/stat`, `/proc/meminfo`, `/sys/class/thermal/thermal_zone0/temp` (CPU die sensors), `/sys/class/backlight/*/{brightness,max_brightness}` (built-in display) and `/etc/hostname`. |
 | `Quickshell.Wayland` | `WlrLayershell` (attached), `WlrLayer`, `WlrKeyboardFocus`, `WlSessionLock`, `WlSessionLockSurface`, `IdleInhibitor`, `IdleMonitor`, `ScreencopyView`, `ToplevelManager` | Layers map to NSWindow levels. `WlSessionLock` locks with the macOS lock screen. `IdleInhibitor` holds a display-sleep assertion; `IdleMonitor` reads the system idle time. |
 | `Quickshell.Widgets` | `IconImage` | |
@@ -100,6 +113,7 @@ numbered from 1000 and keep their name.
   - `loginctl lock-session|kill-session` -> lock screen / log out
   - `systemd-inhibit` -> `caffeinate`
   - `brightnessctl get|set|info` -> built-in display brightness
+  - `hyprctl dispatch ...` -> yabai/AeroSpace (see dispatchers above); no queries
 - **Permissions.** Laumei is an app bundle (`Laumei.app`, no Dock icon) so macOS
   can ask for Location (Wi-Fi names) and Bluetooth access. Builds are ad-hoc
   signed, so a rebuild may ask again.

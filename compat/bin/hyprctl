@@ -1,0 +1,4 @@
+#!/bin/sh
+# hyprctl -> `laumei hyprctl`: `dispatch` is mapped onto yabai or AeroSpace
+# (workspaces, focus, moves, close, float, fullscreen, exec); queries aren't.
+exec "$(dirname "$0")/../../../MacOS/Laumei" hyprctl "$@"

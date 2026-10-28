@@ -5,6 +5,7 @@
 //   laumei [-p <path> | -c <name>] ipc call <target> <function> [args...]
 //   laumei [-p <path> | -c <name>] kill              stop the running shell
 //   laumei [-p <path> | -c <name>] notify-send [options] <summary> [body]
+//   laumei hyprctl dispatch <dispatcher> [args]      (see Hyprland::dispatch)
 //
 // <path> is a shell.qml or a directory holding one; -c <name> means
 // ~/.config/quickshell/<name>. Default: ~/.config/quickshell/shell.qml.
@@ -31,6 +32,7 @@
 #include <mach-o/dyld.h>
 #include <unistd.h>
 
+#include "hyprland.h"
 #include "iconprovider.h"
 #include "ipc.h"
 #include "macwindow.h"
@@ -57,7 +59,8 @@ void usage() {
                "       laumei [-p <path> | -c <name>] ipc show\n"
                "       laumei [-p <path> | -c <name>] ipc call <target> <function> [args...]\n"
                "       laumei [-p <path> | -c <name>] kill\n"
-               "       laumei [-p <path> | -c <name>] notify-send [options] <summary> [body]\n",
+               "       laumei [-p <path> | -c <name>] notify-send [options] <summary> [body]\n"
+               "       laumei hyprctl dispatch <dispatcher> [args]\n",
                stderr);
 }
 
@@ -194,6 +197,14 @@ QJsonObject parseNotifySend(const QStringList& args, bool* printId) {
 int runClient(const QStringList& rest) {
     QJsonObject req;
     bool printId = false;
+    if (rest.value(0) == "hyprctl") {
+        // Only dispatch: it runs window manager commands, no shell needed.
+        if (rest.value(1) != "dispatch" || rest.size() < 3) {
+            std::fprintf(stderr, "hyprctl: only `dispatch` is supported on macOS\n");
+            return 1;
+        }
+        return Hyprland::dispatchTo(Hyprland::detectBackend(), rest.mid(2).join(' ')) ? 0 : 1;
+    }
     if (rest.value(0) == "kill") req = {{"cmd", "kill"}};
     else if (rest.value(0) == "notify-send") {
         const QJsonObject n = parseNotifySend(rest.mid(1), &printId);

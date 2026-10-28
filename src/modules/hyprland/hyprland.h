@@ -159,6 +159,12 @@ signals:
 public:
     enum class Backend { Yabai, AeroSpace };
 
+    // yabai when installed, else AeroSpace; LAUMEI_WM=aerospace|yabai chooses.
+    static Backend detectBackend();
+    // dispatch() without a running shell (for `laumei hyprctl dispatch`).
+    // False if there's no equivalent.
+    static bool dispatchTo(Backend backend, const QString& request);
+
     // What the window manager reported, before it's applied to the models.
     struct Snapshot {
         struct Monitor { int id; QString name; bool focused; };
