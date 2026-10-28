@@ -21,8 +21,13 @@ Window {
     property var mask: null
     property var surfaceFormat: null
 
+    // Top-level even when declared inside an Item: Qt would otherwise make it
+    // transient for that Item's window and keep it hidden while there is none.
+    transientParent: null
     visible: true
-    flags: Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint
+    // No-focus from the first show: set later (in _configure), Qt has already
+    // made the window key and pulled focus from the frontmost app.
+    flags: Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint | (_wantsFocus() ? 0 : Qt.WindowDoesNotAcceptFocus)
 
     // A `screen` set by the config (bars bound to Variants' modelData) pins
     // the window; otherwise it opens on the screen under the mouse, standing

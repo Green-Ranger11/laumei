@@ -33,6 +33,12 @@ ShellRoot {
         stdout: StdioCollector { id: out }
     }
 
+    // A PanelWindow inside an Item, shown later through a binding.
+    property bool showNested: false
+    Item {
+        PanelWindow { id: nested; implicitWidth: 10; implicitHeight: 10; visible: root.showNested }
+    }
+
     property FileView file: FileView { path: Quickshell.cacheDir + "/laumei-test.txt"; printErrors: false }
 
     Component.onCompleted: {
@@ -48,6 +54,8 @@ ShellRoot {
         t.check("LazyLoader active", lazy.item !== null && lazyCreated === 1);
         lazy.active = false;
         t.check("LazyLoader released", lazy.item === null);
+        showNested = true;
+        t.check("nested PanelWindow shows", nested.visible);
         file.setText("written by laumei tests\n");
         t.check("FileView round trip", file.text() === "written by laumei tests\n", file.text());
         echo.running = true;
