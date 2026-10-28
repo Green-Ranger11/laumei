@@ -36,7 +36,7 @@ translated.
 - **Wi-Fi:** network names need Location access. Forgetting a network asks
   for an admin password. `autoconnect` has no effect.
 - **Media:** macOS has one system-wide "Now Playing" session, so there is at
-  most one player. No artwork yet.
+  most one player.
 - **Notifications:** a `NotificationServer` receives `notify-send` from the
   shell's own scripts. Other apps post to Notification Center, which macOS
   doesn't let another app replace, so their banners stay macOS's. With

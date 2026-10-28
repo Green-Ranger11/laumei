@@ -1,6 +1,10 @@
 #include "mpris.h"
 
+#include <QCryptographicHash>
+#include <QDir>
+#include <QFile>
 #include <QJsonDocument>
+#include <QUrl>
 #include <QProcessEnvironment>
 
 #include "paths.h"
@@ -25,6 +29,26 @@ QString appName(const QString& bundleId) {
     return name;
 }
 
+// Now-playing artwork (base64 from media-control) as a file URL, written to
+// the cache once per image; the previous one is removed.
+QString artUrl(const QJsonObject& s, const QString& previous) {
+    const QByteArray data = QByteArray::fromBase64(s.value("artworkData").toString().toLatin1());
+    if (data.isEmpty()) {
+        if (!previous.isEmpty()) QFile::remove(QUrl(previous).toLocalFile());
+        return {};
+    }
+    const QString ext = s.value("artworkMimeType").toString() == "image/png" ? ".png" : ".jpg";
+    const QString path = QsPaths::cacheDir() + "/mpris-art-" +
+                         QCryptographicHash::hash(data, QCryptographicHash::Md5).toHex() + ext;
+    const QString url = QUrl::fromLocalFile(path).toString();
+    if (url == previous) return url;
+    QDir().mkpath(QsPaths::cacheDir());
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly) || f.write(data) != data.size()) return {};
+    if (!previous.isEmpty()) QFile::remove(QUrl(previous).toLocalFile());
+    return url;
+}
+
 } // namespace
 
 qreal MprisPlayer::position() const {
@@ -38,6 +62,7 @@ void MprisPlayer::apply(const QJsonObject& s) {
     mTitle = s.value("title").toString();
     mArtist = s.value("artist").toString();
     mAlbum = s.value("album").toString();
+    mArtUrl = artUrl(s, mArtUrl);
     mPlaying = s.value("playing").toBool();
     mRate = s.value("playbackRate").toDouble();
     mElapsed = s.value("elapsedTime").toDouble();
@@ -91,7 +116,8 @@ Mpris::~Mpris() {
 void Mpris::start() {
     if (mStream.state() != QProcess::NotRunning) return;
     mBuffer.clear();
-    mStream.start("/bin/sh", {"-c", "exec media-control stream --no-diff --no-artwork"});
+    // Diffs, so the artwork (hundreds of KB) only comes when it changes.
+    mStream.start("/bin/sh", {"-c", "exec media-control stream"});
 }
 
 void Mpris::onLine(const QByteArray& line) {

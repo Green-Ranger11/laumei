@@ -61,7 +61,7 @@ public:
     QString trackTitle() const { return mTitle; }
     QString trackArtist() const { return mArtist; }
     QString trackAlbum() const { return mAlbum; }
-    QString trackArtUrl() const { return {}; }
+    QString trackArtUrl() const { return mArtUrl; }
     qreal length() const { return mLength; }
     bool lengthSupported() const { return mLength > 0; }
     qreal position() const;
@@ -84,7 +84,7 @@ signals:
 private:
     static void command(const QStringList& args);
 
-    QString mIdentity, mBundleId, mTitle, mArtist, mAlbum;
+    QString mIdentity, mBundleId, mTitle, mArtist, mAlbum, mArtUrl;
     bool mPlaying = false;
     qreal mLength = 0;
     qreal mElapsed = 0;

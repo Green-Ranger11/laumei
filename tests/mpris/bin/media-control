@@ -1,0 +1,9 @@
+#!/bin/sh
+# Fake media-control: one full update, then a diff, then idle.
+case "$1" in
+    stream)
+        echo '{"type":"data","diff":false,"payload":{"bundleIdentifier":"com.apple.Music","title":"Song","artist":"Band","playing":true,"duration":200,"elapsedTime":10,"artworkMimeType":"image/png","artworkData":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="}}'
+        sleep 1
+        echo '{"type":"data","diff":true,"payload":{"title":"Next song"}}'
+        sleep 30 ;;
+esac
