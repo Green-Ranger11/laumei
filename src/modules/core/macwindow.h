@@ -28,6 +28,12 @@ public:
     // changing, for a bar stepping aside while the native menu bar shows.
     Q_INVOKABLE void setSuppressed(QWindow* window, bool suppressed);
 
+    // Clicks outside `region` (a Region; null for the whole window) pass
+    // through to what is below, as with a Quickshell input mask.
+    Q_INVOKABLE void setInputMask(QWindow* window, QObject* region);
+    // Whether a window-coordinate point is inside `region` (for tests).
+    Q_INVOKABLE bool maskContains(QObject* region, qreal x, qreal y) const;
+
     // No Dock icon or menu bar; called once at startup.
     static void makeAccessoryApp();
 };

@@ -45,3 +45,24 @@ public:
     enum Enum { Normal = 0, Ignore = 1, Auto = 2 };
     Q_ENUM(Enum)
 };
+
+// Quickshell's Region enums (Region.shape / Region.intersection).
+class RegionShape : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("RegionShape is an enum.")
+
+public:
+    enum Enum { Rect = 0, Ellipse = 1 };
+    Q_ENUM(Enum)
+};
+
+class Intersection : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("Intersection is an enum.")
+
+public:
+    enum Enum { Combine = 0, Subtract = 1, Intersect = 2, Xor = 3 };
+    Q_ENUM(Enum)
+};

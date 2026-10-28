@@ -88,6 +88,7 @@ Window {
     Component.onCompleted: {
         _completed = true;
         _place();
+        if (mask) QsMacWindow.setInputMask(win, mask);
         if (visible) Qt.callLater(_shown);
     }
 
@@ -101,6 +102,8 @@ Window {
             QsMacWindow.restoreFocus();
         }
     }
+
+    onMaskChanged: if (_completed) QsMacWindow.setInputMask(win, mask)
 
     onImplicitWidthChanged: if (_completed) _place()
     onImplicitHeightChanged: if (_completed) _place()

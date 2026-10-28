@@ -2,7 +2,12 @@
 
 #import <AppKit/AppKit.h>
 
+#include <QCursor>
 #include <QHash>
+#include <QPointer>
+#include <QQmlListReference>
+#include <QQuickItem>
+#include <QRegion>
 
 namespace {
 
@@ -62,7 +67,82 @@ QHash<QWindow*, int>& configured() {
     return windows;
 }
 
+// A Region in window coordinates: its item's rect (or x/y/width/height),
+// then each child region applied by its intersection mode.
+QRegion regionOf(QObject* r) {
+    QRect rect;
+    if (auto* item = qobject_cast<QQuickItem*>(r->property("item").value<QObject*>()))
+        rect = item->mapRectToScene(QRectF(0, 0, item->width(), item->height())).toAlignedRect();
+    else
+        rect = QRectF(r->property("x").toReal(), r->property("y").toReal(), r->property("width").toReal(),
+                      r->property("height").toReal())
+                   .toAlignedRect();
+    QRegion out(rect, r->property("shape").toInt() == 1 ? QRegion::Ellipse : QRegion::Rectangle);
+
+    QQmlListReference children(r, "regions");
+    for (qsizetype i = 0; i < children.count(); i++) {
+        QObject* child = children.at(i);
+        const QRegion c = regionOf(child);
+        switch (child->property("intersection").toInt()) {
+        case 1: out = out.subtracted(c); break;
+        case 2: out = out.intersected(c); break;
+        case 3: out = out.xored(c); break;
+        default: out = out.united(c);
+        }
+    }
+    return out;
+}
+
+// Masked windows and their regions. macOS has no input masks, so a window
+// ignores the mouse while the cursor is outside its region, re-checked on
+// every mouse move (ours and other apps').
+QHash<QWindow*, QPointer<QObject>>& masked() {
+    static QHash<QWindow*, QPointer<QObject>> windows;
+    return windows;
+}
+
+void updateMasks() {
+    const QPoint cursor = QCursor::pos();
+    for (auto it = masked().cbegin(); it != masked().cend(); ++it) {
+        NSWindow* w = nsWindow(it.key());
+        if (!w || !it.value()) continue;
+        const bool inside = regionOf(it.value()).contains(it.key()->mapFromGlobal(cursor));
+        if (w.ignoresMouseEvents == inside) [w setIgnoresMouseEvents:!inside];
+    }
+}
+
+void watchMouse() {
+    static bool watching = false;
+    if (watching) return;
+    watching = true;
+    const NSEventMask mask = NSEventMaskMouseMoved | NSEventMaskLeftMouseDragged | NSEventMaskRightMouseDragged |
+                             NSEventMaskScrollWheel;
+    [NSEvent addGlobalMonitorForEventsMatchingMask:mask handler:^(NSEvent*) { updateMasks(); }];
+    [NSEvent addLocalMonitorForEventsMatchingMask:mask handler:^NSEvent*(NSEvent* e) {
+        updateMasks();
+        return e;
+    }];
+}
+
 } // namespace
+
+void QsMacWindow::setInputMask(QWindow* window, QObject* region) {
+    if (!window) return;
+    if (!region) {
+        masked().remove(window);
+        if (NSWindow* w = nsWindow(window)) [w setIgnoresMouseEvents:NO];
+        return;
+    }
+    if (!masked().contains(window))
+        QObject::connect(window, &QObject::destroyed, [window] { masked().remove(window); });
+    masked().insert(window, region);
+    watchMouse();
+    updateMasks();
+}
+
+bool QsMacWindow::maskContains(QObject* region, qreal x, qreal y) const {
+    return region && regionOf(region).contains(QPointF(x, y).toPoint());
+}
 
 void QsMacWindow::configure(QWindow* window, int layer, int keyboardFocus) {
     // Flags first: changing them makes Qt reapply its own window level.
