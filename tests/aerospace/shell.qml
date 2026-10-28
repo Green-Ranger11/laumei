@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Wayland
 import "../lib"
 
 ShellRoot {
@@ -21,6 +22,12 @@ ShellRoot {
             t.check("focused workspace", Hyprland.focusedWorkspace?.id === 1);
             t.check("toplevels per workspace", Hyprland.focusedWorkspace?.toplevels.values.length === 1);
             t.check("monitor name", Hyprland.focusedMonitor?.name === "Test Display", Hyprland.focusedMonitor?.name);
+            t.check("ToplevelManager toplevels", ToplevelManager.toplevels.values.length === 3);
+            t.check("activeToplevel", ToplevelManager.activeToplevel?.appId === "kitty", ToplevelManager.activeToplevel?.appId);
+            ToplevelManager.toplevels.values.find(w => w.appId === "Firefox").activate();
+            Hyprland.dispatch("killactive");
+            Hyprland.dispatch("movefocus l");
+            Hyprland.dispatch("togglefloating");
             Hyprland.dispatch("hl.dsp.focus({ workspace = 2 })");
             Hyprland.dispatch("movetoworkspace web");
             dispatched.start();
@@ -34,6 +41,10 @@ ShellRoot {
             const lines = log.text().trim().split("\n");
             t.check("dispatch focus", lines.includes("workspace 2"), JSON.stringify(lines));
             t.check("dispatch move", lines.includes("move-node-to-workspace --focus-follows-window web"));
+            t.check("Toplevel.activate", lines.includes("focus --window-id 12"), JSON.stringify(lines));
+            t.check("killactive", lines.includes("close"));
+            t.check("movefocus", lines.includes("focus left"));
+            t.check("togglefloating", lines.includes("layout floating tiling"));
             t.finish();
         }
     }

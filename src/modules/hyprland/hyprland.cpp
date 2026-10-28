@@ -66,6 +66,14 @@ void HyprlandWorkspace::set(bool active, bool focused, HyprlandMonitor* monitor)
     emit changed();
 }
 
+void HyprlandToplevel::activate() {
+    if (auto* h = qobject_cast<Hyprland*>(QObject::parent())) h->dispatch("focuswindow address:" + address());
+}
+
+void HyprlandToplevel::close() {
+    if (auto* h = qobject_cast<Hyprland*>(QObject::parent())) h->dispatch("closewindow address:" + address());
+}
+
 void HyprlandWorkspace::activate() {
     if (auto* h = qobject_cast<Hyprland*>(parent())) h->dispatch("workspace " + mName);
 }
@@ -317,37 +325,61 @@ void Hyprland::apply(const Snapshot& snap) {
 
 void Hyprland::dispatch(const QString& request) {
     static const QRegularExpression luaTarget(R"re(workspace\s*=\s*"?([^",}\s]+)"?)re");
-    static const QRegularExpression classic(R"re(^\s*(workspace|movetoworkspace|movetoworkspacesilent)\s+(\S+))re");
+    static const QRegularExpression classic(R"re(^\s*(\w+)\s*(.*?)\s*$)re");
+    const bool yabai = mBackend == Backend::Yabai;
 
     QString verb, target;
-    if (auto m = classic.match(request); m.hasMatch()) {
+    if (auto m = classic.match(request); m.hasMatch() && !request.contains("hl.")) {
         verb = m.captured(1);
         target = m.captured(2);
     } else if (auto m2 = luaTarget.match(request); m2.hasMatch()) {
         target = m2.captured(1);
         verb = request.contains("window.move") ? (request.contains("silent") ? "movetoworkspacesilent" : "movetoworkspace")
                                                : "workspace";
+    }
+
+    // Window and direction arguments for the commands below.
+    const QString windowId = target.startsWith("address:") ? QString::number(target.mid(8).toInt(nullptr, 16)) : QString();
+    static const QHash<QString, QString> yabaiDir{{"l", "west"}, {"r", "east"}, {"u", "north"}, {"d", "south"}};
+    static const QHash<QString, QString> aeroDir{{"l", "left"}, {"r", "right"}, {"u", "up"}, {"d", "down"}};
+    const QString dir = target.left(1).toLower();
+
+    if (verb == "exec" && !target.isEmpty()) {
+        runDetached(target);
+    } else if (verb == "focuswindow" && !windowId.isEmpty()) {
+        runDetached(yabai ? "yabai -m window --focus \"$1\"" : "aerospace focus --window-id \"$1\"", {windowId});
+    } else if (verb == "closewindow" && !windowId.isEmpty()) {
+        runDetached(yabai ? "yabai -m window \"$1\" --close" : "aerospace close --window-id \"$1\"", {windowId});
+    } else if (verb == "killactive") {
+        runDetached(yabai ? "yabai -m window --close" : "aerospace close");
+    } else if (verb == "togglefloating") {
+        runDetached(yabai ? "yabai -m window --toggle float" : "aerospace layout floating tiling");
+    } else if (verb == "fullscreen") {
+        runDetached(yabai ? "yabai -m window --toggle zoom-fullscreen" : "aerospace fullscreen");
+    } else if ((verb == "movefocus" || verb == "movewindow") && yabaiDir.contains(dir)) {
+        if (yabai) runDetached(verb == "movefocus" ? "yabai -m window --focus \"$1\"" : "yabai -m window --swap \"$1\"", {yabaiDir[dir]});
+        else runDetached(verb == "movefocus" ? "aerospace focus \"$1\"" : "aerospace move \"$1\"", {aeroDir[dir]});
+    } else if (verb == "workspace" || verb == "movetoworkspace" || verb == "movetoworkspacesilent") {
+        // "e+1"/"e-1" (and "+1"/"-1"): next/previous workspace.
+        QString sel = target;
+        if (target.endsWith("+1")) sel = "next";
+        else if (target.endsWith("-1")) sel = "prev";
+
+        if (yabai) {
+            // Workspace N is the space labelled wsN if there is one, else index N.
+            const QString space = R"(s="$1"; case "$s" in *[!0-9]*) ;; *) yabai -m query --spaces --space "ws$s" >/dev/null 2>&1 && s="ws$s";; esac; )";
+            if (verb == "workspace") runDetached(space + "yabai -m space --focus \"$s\"", {sel});
+            else if (verb == "movetoworkspacesilent") runDetached(space + "yabai -m window --space \"$s\"", {sel});
+            // Move, then follow; one shell so the focus waits for the move.
+            else runDetached(space + "yabai -m window --space \"$s\" && yabai -m space --focus \"$s\"", {sel});
+        } else {
+            if (verb == "workspace") runDetached("aerospace workspace \"$1\"", {sel});
+            else if (verb == "movetoworkspacesilent") runDetached("aerospace move-node-to-workspace \"$1\"", {sel});
+            else runDetached("aerospace move-node-to-workspace --focus-follows-window \"$1\"", {sel});
+        }
     } else {
         qWarning().noquote() << "Hyprland.dispatch: no equivalent for" << request;
         return;
-    }
-
-    // "e+1"/"e-1" (and "+1"/"-1"): next/previous workspace.
-    QString sel = target;
-    if (target.endsWith("+1")) sel = "next";
-    else if (target.endsWith("-1")) sel = "prev";
-
-    if (mBackend == Backend::Yabai) {
-        // Workspace N is the space labelled wsN if there is one, else index N.
-        const QString space = R"(s="$1"; case "$s" in *[!0-9]*) ;; *) yabai -m query --spaces --space "ws$s" >/dev/null 2>&1 && s="ws$s";; esac; )";
-        if (verb == "workspace") runDetached(space + "yabai -m space --focus \"$s\"", {sel});
-        else if (verb == "movetoworkspacesilent") runDetached(space + "yabai -m window --space \"$s\"", {sel});
-        // Move, then follow; one shell so the focus waits for the move.
-        else runDetached(space + "yabai -m window --space \"$s\" && yabai -m space --focus \"$s\"", {sel});
-    } else {
-        if (verb == "workspace") runDetached("aerospace workspace \"$1\"", {sel});
-        else if (verb == "movetoworkspacesilent") runDetached("aerospace move-node-to-workspace \"$1\"", {sel});
-        else runDetached("aerospace move-node-to-workspace --focus-follows-window \"$1\"", {sel});
     }
     mDebounce.start();
 }

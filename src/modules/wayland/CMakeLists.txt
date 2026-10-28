@@ -1,3 +1,5 @@
+set_source_files_properties(ToplevelManager.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_library(laumei_wayland STATIC)
 qt_add_qml_module(laumei_wayland
     URI Quickshell.Wayland
@@ -9,6 +11,7 @@ qt_add_qml_module(laumei_wayland
         WlSessionLock.qml
         WlSessionLockSurface.qml
         ScreencopyView.qml
+        ToplevelManager.qml
     DEPENDENCIES
         QtQuick
 )

@@ -13,6 +13,9 @@
 // numeric names become ids). Displays are the monitors, windows the toplevels.
 // yabai is used when installed; set LAUMEI_WM=aerospace (or yabai) to choose.
 
+// Also stands in for Quickshell.Wayland's Toplevel (its `wayland`, and the
+// entries of ToplevelManager): maximized/minimized/fullscreen/screens are
+// not tracked and read as false/empty.
 class HyprlandToplevel : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -21,6 +24,12 @@ class HyprlandToplevel : public QObject {
     Q_PROPERTY(QString title READ title NOTIFY changed)
     Q_PROPERTY(QString appId READ appId NOTIFY changed)
     Q_PROPERTY(bool activated READ activated NOTIFY changed)
+    Q_PROPERTY(QObject* wayland READ wayland CONSTANT)
+    Q_PROPERTY(QObject* parent READ toplevelParent CONSTANT)
+    Q_PROPERTY(bool maximized MEMBER mFalse CONSTANT)
+    Q_PROPERTY(bool minimized MEMBER mFalse CONSTANT)
+    Q_PROPERTY(bool fullscreen MEMBER mFalse CONSTANT)
+    Q_PROPERTY(QList<QObject*> screens MEMBER mScreens CONSTANT)
 
 public:
     HyprlandToplevel(int id, QObject* parent) : QObject(parent), mId(id) {}
@@ -28,7 +37,13 @@ public:
     QString title() const { return mTitle; }
     QString appId() const { return mApp; }
     bool activated() const { return mActivated; }
+    QObject* wayland() { return this; }
+    QObject* toplevelParent() const { return nullptr; }
     void set(const QString& title, const QString& app, bool activated);
+
+    // Focus (switching to its workspace) / close the window.
+    Q_INVOKABLE void activate();
+    Q_INVOKABLE void close();
 
 signals:
     void changed();
@@ -37,6 +52,8 @@ private:
     int mId;
     QString mTitle, mApp;
     bool mActivated = false;
+    bool mFalse = false;
+    QList<QObject*> mScreens;
 };
 
 class HyprlandMonitor;
@@ -124,9 +141,11 @@ public:
     HyprlandWorkspace* focusedWorkspace() const { return mFocusedWorkspace; }
     HyprlandMonitor* focusedMonitor() const { return mFocusedMonitor; }
 
-    // Hyprland dispatchers mapped onto the window manager: workspace switching
-    // and moving the active window, in both "workspace 3" and Lua
-    // `hl.dsp.focus({ workspace = 3 })` forms. Others are logged and ignored.
+    // Hyprland dispatchers mapped onto the window manager: workspace,
+    // movetoworkspace(silent), focuswindow/closewindow address:0x..,
+    // killactive, togglefloating, fullscreen, movefocus, movewindow and exec,
+    // plus Lua `hl.dsp.focus({ workspace = 3 })`-style workspace moves.
+    // Others are logged and ignored.
     Q_INVOKABLE void dispatch(const QString& request);
     Q_INVOKABLE void refreshWorkspaces() { refresh(); }
     Q_INVOKABLE void refreshMonitors() { refresh(); }

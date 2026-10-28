@@ -72,20 +72,3 @@ private:
     bool mIdle = false;
 };
 
-// Foreign toplevel management has no macOS counterpart for other apps'
-// windows; the list stays empty.
-class ToplevelManager : public QObject {
-    Q_OBJECT
-    QML_ELEMENT
-    QML_SINGLETON
-    Q_PROPERTY(ObjectModel* toplevels READ toplevels CONSTANT)
-    Q_PROPERTY(QObject* activeToplevel READ activeToplevel CONSTANT)
-
-public:
-    explicit ToplevelManager(QObject* parent = nullptr) : QObject(parent), mToplevels(new ObjectModel(this)) {}
-    ObjectModel* toplevels() const { return mToplevels; }
-    QObject* activeToplevel() const { return nullptr; }
-
-private:
-    ObjectModel* mToplevels;
-};
