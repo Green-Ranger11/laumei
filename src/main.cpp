@@ -4,6 +4,7 @@
 //   laumei [-p <path> | -c <name>] ipc show          list IPC targets
 //   laumei [-p <path> | -c <name>] ipc call <target> <function> [args...]
 //   laumei [-p <path> | -c <name>] kill              stop the running shell
+//   laumei [-p <path> | -c <name>] notify-send [options] <summary> [body]
 //
 // <path> is a shell.qml or a directory holding one; -c <name> means
 // ~/.config/quickshell/<name>. Default: ~/.config/quickshell/shell.qml.
@@ -55,7 +56,8 @@ void usage() {
     std::fputs("usage: laumei [-p <path> | -c <name>] [--replace]\n"
                "       laumei [-p <path> | -c <name>] ipc show\n"
                "       laumei [-p <path> | -c <name>] ipc call <target> <function> [args...]\n"
-               "       laumei [-p <path> | -c <name>] kill\n",
+               "       laumei [-p <path> | -c <name>] kill\n"
+               "       laumei [-p <path> | -c <name>] notify-send [options] <summary> [body]\n",
                stderr);
 }
 
@@ -144,9 +146,63 @@ private:
     QTimer mDebounce;
 };
 
+// notify-send's arguments as a Notification's fields. Actions, waiting and
+// replacing (-A, -w, -r) are accepted and ignored. Empty if malformed.
+QJsonObject parseNotifySend(const QStringList& args, bool* printId) {
+    QJsonObject n{{"urgency", 1}}, hints;
+    QStringList positional;
+    for (int i = 0; i < args.size(); i++) {
+        QString opt = args[i], value;
+        if (!opt.startsWith('-') || opt == "-") { positional << opt; continue; }
+        if (opt == "--") { positional << args.mid(i + 1); break; }
+        if (const int eq = opt.indexOf('='); opt.startsWith("--") && eq > 0) {
+            value = opt.mid(eq + 1);
+            opt.truncate(eq);
+        }
+        static const QStringList flags{"-p", "--print-id", "-e", "--transient", "-w", "--wait"};
+        if (flags.contains(opt)) {
+            if (opt == "-p" || opt == "--print-id") *printId = true;
+            if (opt == "-e" || opt == "--transient") n["transient"] = true;
+            continue;
+        }
+        if (value.isNull()) {
+            if (++i >= args.size()) return {};
+            value = args[i];
+        }
+        if (opt == "-a" || opt == "--app-name") n["appName"] = value;
+        else if (opt == "-i" || opt == "--icon") n["appIcon"] = value;
+        else if (opt == "-t" || opt == "--expire-time") n["expireTimeout"] = value.toDouble() / 1000;
+        else if (opt == "-c" || opt == "--category") hints["category"] = value;
+        else if (opt == "-u" || opt == "--urgency")
+            n["urgency"] = value == "low" ? 0 : value == "critical" ? 2 : 1;
+        else if (opt == "-h" || opt == "--hint") {
+            // TYPE:NAME:VALUE
+            const QStringList parts = value.split(':');
+            if (parts.size() < 3) return {};
+            hints[parts[1]] = parts.mid(2).join(':');
+            if (parts[1] == "image-path" || parts[1] == "image_path") n["image"] = parts.mid(2).join(':');
+            if (parts[1] == "desktop-entry") n["desktopEntry"] = parts.mid(2).join(':');
+        }
+    }
+    if (positional.isEmpty()) return {};
+    n["summary"] = positional[0];
+    n["body"] = positional.value(1);
+    n["hints"] = hints;
+    return n;
+}
+
 int runClient(const QStringList& rest) {
     QJsonObject req;
+    bool printId = false;
     if (rest.value(0) == "kill") req = {{"cmd", "kill"}};
+    else if (rest.value(0) == "notify-send") {
+        const QJsonObject n = parseNotifySend(rest.mid(1), &printId);
+        if (n.isEmpty()) {
+            usage();
+            return 2;
+        }
+        req = {{"cmd", "notify"}, {"notification", n}};
+    }
     else if (rest.value(0) == "ipc" && rest.value(1) == "show") req = {{"cmd", "show"}};
     else if (rest.value(0) == "ipc" && rest.value(1) == "call" && rest.size() >= 4)
         req = {{"cmd", "call"}, {"target", rest[2]}, {"function", rest[3]},
@@ -173,6 +229,7 @@ int runClient(const QStringList& rest) {
         }
     }
     if (const QString r = reply.value("result").toString(); !r.isEmpty()) std::printf("%s\n", qPrintable(r));
+    if (printId) std::printf("%d\n", reply.value("id").toInt());
     return 0;
 }
 
@@ -187,7 +244,9 @@ int main(int argc, char** argv) {
     QStringList rest;
     for (int i = 0; i < args.size(); i++) {
         const QString& a = args[i];
-        if ((a == "-p" || a == "--path") && i + 1 < args.size()) path = args[++i];
+        // Everything after the subcommand is its own (notify-send has a -p too).
+        if (!rest.isEmpty()) rest << a;
+        else if ((a == "-p" || a == "--path") && i + 1 < args.size()) path = args[++i];
         else if ((a == "-c" || a == "--config") && i + 1 < args.size()) name = args[++i];
         else if (a == "--replace") replace = true;
         else if (a == "-h" || a == "--help") { usage(); return 0; }
@@ -238,6 +297,8 @@ int main(int argc, char** argv) {
         }
     }
 
+    // The compat notify-send reads this to reach this shell rather than the default one.
+    qputenv("LAUMEI_SHELL", QsPaths::shellPath().toUtf8());
     Shell shell(QsPaths::shellPath());
     if (!shell.load()) return 1;
     return app.exec();

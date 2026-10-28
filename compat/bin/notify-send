@@ -1,12 +1,22 @@
 #!/bin/sh
-# notify-send -> a macOS notification via osascript. Options are skipped
-# (-a sets the subtitle); the first two plain arguments are summary and body.
+# notify-send -> the running shell's NotificationServer when it has one (the
+# shell started from this bundle sets LAUMEI_SHELL; otherwise the default
+# shell is tried), else a macOS notification via osascript.
+laumei="$(dirname "$0")/../../../MacOS/Laumei"
+if [ -n "$LAUMEI_SHELL" ]; then
+    "$laumei" -p "$LAUMEI_SHELL" notify-send "$@" 2>/dev/null && exit 0
+else
+    "$laumei" notify-send "$@" 2>/dev/null && exit 0
+fi
+
+# Options are skipped (-a sets the subtitle); the first two plain arguments
+# are summary and body.
 app=""
 while [ $# -gt 0 ]; do
     case "$1" in
         -a|--app-name) app="$2"; shift 2 ;;
         --app-name=*) app="${1#*=}"; shift ;;
-        -u|--urgency|-t|--expire-time|-i|--icon|-c|--category|-h|--hint) shift 2 ;;
+        -u|--urgency|-t|--expire-time|-i|--icon|-c|--category|-h|--hint|-A|--action|-r|--replace-id) shift 2 ;;
         -*) shift ;;
         *) break ;;
     esac

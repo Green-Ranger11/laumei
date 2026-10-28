@@ -6,10 +6,11 @@
 
 #include "objectmodel.h"
 
-// Quickshell.Services.Notifications, inert on macOS: apps post to Notification
+// Quickshell.Services.Notifications on macOS. Apps post to Notification
 // Center, which no other process can stand in for, so a NotificationServer
-// here loads but never receives anything. Kept so configs that include one
-// still load.
+// gets two feeds instead: `notify-send` run against this shell, and copies of
+// what lands in Notification Center (read from its database, see ncbridge.mm).
+// Actions, replacement and images aren't supported.
 
 class NotificationUrgency : public QObject {
     Q_OBJECT
@@ -31,6 +32,8 @@ public:
     Q_ENUM(Enum)
 };
 
+// The only action Laumei makes: "default" on a notification copied from
+// Notification Center, opening the app that posted it.
 class NotificationAction : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -39,11 +42,12 @@ class NotificationAction : public QObject {
     Q_PROPERTY(QString text MEMBER mText CONSTANT)
 
 public:
-    using QObject::QObject;
-    Q_INVOKABLE void invoke() {}
+    NotificationAction(const QString& bundleId, QObject* parent)
+        : QObject(parent), mIdentifier("default"), mText("Open"), mBundleId(bundleId) {}
+    Q_INVOKABLE void invoke();
 
 private:
-    QString mIdentifier, mText;
+    QString mIdentifier, mText, mBundleId;
 };
 
 class Notification : public QObject {
@@ -51,38 +55,49 @@ class Notification : public QObject {
     QML_ELEMENT
     QML_UNCREATABLE("Notifications come from a NotificationServer.")
     Q_PROPERTY(int id MEMBER mId CONSTANT)
-    Q_PROPERTY(bool tracked MEMBER mTracked NOTIFY trackedChanged)
+    Q_PROPERTY(bool tracked READ tracked WRITE setTracked NOTIFY trackedChanged)
     Q_PROPERTY(bool lastGeneration MEMBER mFalse CONSTANT)
-    Q_PROPERTY(qreal expireTimeout MEMBER mZero CONSTANT)
-    Q_PROPERTY(QString appName MEMBER mEmpty CONSTANT)
-    Q_PROPERTY(QString appIcon MEMBER mEmpty CONSTANT)
-    Q_PROPERTY(QString summary MEMBER mEmpty CONSTANT)
-    Q_PROPERTY(QString body MEMBER mEmpty CONSTANT)
+    Q_PROPERTY(qreal expireTimeout MEMBER mExpireTimeout CONSTANT)
+    Q_PROPERTY(QString appName MEMBER mAppName CONSTANT)
+    Q_PROPERTY(QString appIcon MEMBER mAppIcon CONSTANT)
+    Q_PROPERTY(QString summary MEMBER mSummary CONSTANT)
+    Q_PROPERTY(QString body MEMBER mBody CONSTANT)
     Q_PROPERTY(int urgency MEMBER mUrgency CONSTANT)
     Q_PROPERTY(QList<QObject*> actions MEMBER mActions CONSTANT)
     Q_PROPERTY(bool hasActionIcons MEMBER mFalse CONSTANT)
     Q_PROPERTY(bool resident MEMBER mFalse CONSTANT)
-    Q_PROPERTY(bool transient MEMBER mFalse CONSTANT)
-    Q_PROPERTY(QString desktopEntry MEMBER mEmpty CONSTANT)
-    Q_PROPERTY(QString image MEMBER mEmpty CONSTANT)
+    Q_PROPERTY(bool transient MEMBER mTransient CONSTANT)
+    Q_PROPERTY(QString desktopEntry MEMBER mDesktopEntry CONSTANT)
+    Q_PROPERTY(QString image MEMBER mImage CONSTANT)
     Q_PROPERTY(QVariantMap hints MEMBER mHints CONSTANT)
 
 public:
-    using QObject::QObject;
-    Q_INVOKABLE void expire() {}
-    Q_INVOKABLE void dismiss() {}
+    // `fields` keys are the property names above, plus bundleId: the app
+    // to open from the default action.
+    Notification(int id, const QVariantMap& fields, QObject* parent);
+
+    int id() const { return mId; }
+    bool tracked() const { return mTracked; }
+    // Untracking dismisses, as in Quickshell.
+    void setTracked(bool tracked);
+    Q_INVOKABLE void expire() { close(NotificationCloseReason::Expired); }
+    Q_INVOKABLE void dismiss() { close(NotificationCloseReason::Dismissed); }
 
 signals:
     void trackedChanged();
     void closed(int reason);
 
 private:
-    int mId = 0;
+    void close(int reason);
+
+    int mId;
     bool mTracked = false;
+    bool mClosed = false;
     bool mFalse = false;
-    qreal mZero = 0;
-    QString mEmpty;
-    int mUrgency = NotificationUrgency::Normal;
+    bool mTransient;
+    qreal mExpireTimeout;
+    QString mAppName, mAppIcon, mSummary, mBody, mDesktopEntry, mImage;
+    int mUrgency;
     QList<QObject*> mActions;
     QVariantMap mHints;
 };
@@ -105,7 +120,12 @@ class NotificationServer : public QObject {
 
 public:
     explicit NotificationServer(QObject* parent = nullptr);
+    ~NotificationServer() override;
     ObjectModel* trackedNotifications() const { return mTracked; }
+
+    // Hands a notification (Notification's property names as keys) to the
+    // newest server. Returns its id, or 0 when the shell has no server.
+    static int post(const QVariantMap& fields);
 
 signals:
     void notification(Notification* notification);

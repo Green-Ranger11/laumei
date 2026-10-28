@@ -7,6 +7,8 @@
 #include <QLocalSocket>
 
 #include "ipchandler.h"
+#include "macnotify.h"
+#include "notifications.h"
 #include "paths.h"
 
 namespace {
@@ -32,6 +34,13 @@ QJsonObject handle(const QJsonObject& req) {
         if (!h->call(req.value("function").toString(), args, &result, &error))
             return {{"ok", false}, {"error", error}};
         return {{"ok", true}, {"result", result}};
+    }
+
+    if (cmd == "notify") {
+        const QVariantMap fields = req.value("notification").toObject().toVariantMap();
+        const int id = NotificationServer::post(fields);
+        if (!id) MacNotify::post(fields); // no server in this shell: a macOS banner, as Laumei
+        return {{"ok", true}, {"id", id}};
     }
 
     if (cmd == "kill") {

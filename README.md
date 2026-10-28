@@ -20,7 +20,6 @@ translated.
 
 | Feature | Why not on macOS |
 |---|---|
-| Notification server (`NotificationServer`) | Apps post to Notification Center; macOS gives no way for another app to receive them. |
 | System tray (`SystemTray`, `QsMenuAnchor`) | macOS 27 draws every menu-bar item into one shared window, so there are no per-item icons or menus to mirror. |
 | Custom lock screens (`WlSessionLock`, `PamContext`) | Only macOS's own lock screen is trusted (Touch ID, Apple Watch, FileVault). Locking hands off to it; the lock UI is never shown, and `PamContext` never authenticates. |
 | Exclusive zones | A window can't reserve screen space; set it in the window manager (yabai `external_bar`, AeroSpace `outer.top`). |
@@ -38,6 +37,15 @@ translated.
   for an admin password. `autoconnect` has no effect.
 - **Media:** macOS has one system-wide "Now Playing" session, so there is at
   most one player. No artwork yet.
+- **Notifications:** a `NotificationServer` receives `notify-send` from the
+  shell's own scripts. Other apps post to Notification Center, which macOS
+  doesn't let another app replace, so their banners stay macOS's. With
+  `LAUMEI_NC_BRIDGE=1` Laumei also copies them into the server (for a
+  history list) by reading Notification Center's database, which needs Full
+  Disk Access. Copies carry the hint `x-laumei-notification-center` (macOS
+  already showed a banner) and a `default` action that opens the app, not
+  the specific message. No actions, `-r` replacement or images from
+  `notify-send`.
 
 ## Status
 
@@ -53,7 +61,7 @@ translated.
 | `Quickshell.Services.Mpris` | `Mpris`, `MprisPlayer`, `MprisPlaybackState` | Via [`media-control`](https://github.com/ungive/media-control) (`brew install media-control`); Apple restricts the MediaRemote framework. |
 | `Quickshell.Bluetooth` | `Bluetooth`, `BluetoothAdapter`, `BluetoothDevice`, `BluetoothDeviceState`, `BluetoothAdapterState` | IOBluetooth, with connection state from `system_profiler` (IOBluetooth misreports it on recent macOS). |
 | `Quickshell.Networking` | `Networking`, `WifiDevice`, `WifiNetwork`, `DeviceType`, `ConnectionState`, `WifiSecurityType`, `ConnectionFailReason` | CoreWLAN + `networksetup`. |
-| `Quickshell.Services.Notifications` | `NotificationServer`, `Notification`, `NotificationAction`, `NotificationUrgency`, `NotificationCloseReason` | Inert (see above). |
+| `Quickshell.Services.Notifications` | `NotificationServer`, `Notification`, `NotificationAction`, `NotificationUrgency`, `NotificationCloseReason` | See Notifications above. |
 | `Quickshell.Services.SystemTray` | `SystemTray`, `SystemTrayItem`, `Status`, `Category` | Always empty (see above). |
 | `Quickshell.Services.Pam` | `PamContext`, `PamResult`, `PamError` | `start()` always ends in `error()`. |
 
@@ -86,7 +94,8 @@ numbered from 1000 and keep their name.
     clipboard managers skip it), `--clear`, `--type` and `--watch` (so
     `wl-paste --watch cliphist store` keeps a history; build `cliphist` with
     `go install go.senan.xyz/cliphist@latest`)
-  - `notify-send` -> macOS notifications
+  - `notify-send` -> the shell's `NotificationServer`; with none, a macOS
+    notification from Laumei (asks for permission once)
   - `systemctl suspend|hibernate|reboot|poweroff|is-active` -> `pmset` / System Events
   - `loginctl lock-session|kill-session` -> lock screen / log out
   - `systemd-inhibit` -> `caffeinate`
