@@ -2,6 +2,8 @@
 
 #import <AppKit/AppKit.h>
 
+#include <dlfcn.h>
+
 #include <QCursor>
 #include <QHash>
 #include <QPointer>
@@ -44,9 +46,30 @@ void apply(NSWindow* w, int layer) {
                              NSWindowCollectionBehaviorFullScreenAuxiliary];
 }
 
-// Configured windows and their layers. After a wake a bar was left on a
-// single Space (fixed by recreating it), so the setup is applied again
-// whenever the displays change.
+// Display changes can leave a window in one Space's own window list on top
+// of being on all Spaces (the window server still has it sticky), and then
+// it shows only on that Space; no AppKit call undoes it. Taking it out of
+// that Space does. A window on all Spaces lists every Space of its display,
+// so one entry means it's pinned (or the display has a single Space, where
+// removing it changes nothing).
+void unpin(NSWindow* w) {
+    using ConnFn = int (*)();
+    using SpacesFn = CFArrayRef (*)(int, int, CFArrayRef);
+    using RemoveFn = void (*)(int, CFArrayRef, CFArrayRef);
+    static void* h = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY);
+    static auto conn = h ? reinterpret_cast<ConnFn>(dlsym(h, "SLSMainConnectionID")) : nullptr;
+    static auto spacesOf = h ? reinterpret_cast<SpacesFn>(dlsym(h, "SLSCopySpacesForWindows")) : nullptr;
+    static auto remove = h ? reinterpret_cast<RemoveFn>(dlsym(h, "SLSRemoveWindowsFromSpaces")) : nullptr;
+    if (!conn || !spacesOf || !remove || !w.isVisible) return;
+
+    NSArray* ids = @[ @(w.windowNumber) ];
+    NSArray* spaces = [(NSArray*)spacesOf(conn(), 0x7, (CFArrayRef)ids) autorelease];
+    if (spaces.count == 1) remove(conn(), (CFArrayRef)ids, (CFArrayRef)spaces);
+}
+
+// Configured windows and their layers. The setup is applied again whenever
+// the displays change, and a window pinned to one Space (see unpin) is freed
+// on every Space switch, before it's missed.
 QHash<QWindow*, int>& configured() {
     static QHash<QWindow*, int> windows;
     static bool observing = false;
@@ -56,13 +79,22 @@ QHash<QWindow*, int>& configured() {
             // Give AppKit a moment to finish moving windows around.
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
                 for (auto it = windows.cbegin(); it != windows.cend(); ++it)
-                    if (NSWindow* w = nsWindow(it.key())) apply(w, it.value());
+                    if (NSWindow* w = nsWindow(it.key())) {
+                        apply(w, it.value());
+                        unpin(w);
+                    }
             });
         };
         [NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidChangeScreenParametersNotification
                                                         object:nil queue:NSOperationQueue.mainQueue usingBlock:reapply];
         [NSWorkspace.sharedWorkspace.notificationCenter addObserverForName:NSWorkspaceScreensDidWakeNotification
                                                                    object:nil queue:NSOperationQueue.mainQueue usingBlock:reapply];
+        [NSWorkspace.sharedWorkspace.notificationCenter addObserverForName:NSWorkspaceActiveSpaceDidChangeNotification
+                                                                   object:nil queue:NSOperationQueue.mainQueue
+                                                               usingBlock:^(NSNotification*) {
+            for (auto it = windows.cbegin(); it != windows.cend(); ++it)
+                if (NSWindow* w = nsWindow(it.key())) unpin(w);
+        }];
     }
     return windows;
 }
